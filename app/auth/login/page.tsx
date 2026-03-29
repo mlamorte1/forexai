@@ -27,7 +27,7 @@ export default function LoginPage() {
       } else {
         const { error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+          options: { emailRedirectTo: `https://forexai-steel.vercel.app/auth/callback` }
         })
         if (error) throw error
         setSuccess('Revisa tu email para confirmar tu cuenta.')
