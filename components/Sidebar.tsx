@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈', sprint: 1 },
+  { href: '/market', label: 'Mercado', icon: '◐', sprint: 1 },
   { href: '/settings', label: 'Configuración', icon: '⚙', sprint: 1 },
   { href: '/tactics', label: 'Mis Tácticas', icon: '◉', sprint: 2 },
   { href: '/chat', label: 'Chat Agente', icon: '◎', sprint: 3 },
@@ -40,7 +41,7 @@ export default function Sidebar({ email }: { email: string }) {
       {/* Nav */}
       <nav style={{ padding: '16px 12px', flex: 1 }}>
         {navItems.map(item => {
-          const active = pathname === item.href
+          const active = pathname === item.href || pathname.startsWith(item.href + '/')
           const available = item.sprint === 1
           return (
             <div key={item.href} style={{ marginBottom: '4px' }}>
@@ -96,3 +97,4 @@ export default function Sidebar({ email }: { email: string }) {
     </aside>
   )
 }
+
