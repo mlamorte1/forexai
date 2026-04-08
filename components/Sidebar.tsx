@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation'
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈', sprint: 1 },
   { href: '/market', label: 'Mercado', icon: '◐', sprint: 1 },
+  { href: '/tactics', label: 'Mis Tácticas', icon: '◉', sprint: 1 },
   { href: '/settings', label: 'Configuración', icon: '⚙', sprint: 1 },
-  { href: '/tactics', label: 'Mis Tácticas', icon: '◉', sprint: 2 },
   { href: '/chat', label: 'Chat Agente', icon: '◎', sprint: 3 },
   { href: '/alerts', label: 'Alertas', icon: '◆', sprint: 5 },
 ]
@@ -30,7 +30,6 @@ export default function Sidebar({ email }: { email: string }) {
       borderRight: '1px solid #1e2a40', display: 'flex',
       flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 20
     }}>
-      {/* Logo */}
       <div style={{ padding: '24px 20px 20px' }}>
         <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#00d4a0', letterSpacing: '3px' }}>▶ FOREXAI</div>
         <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '13px', fontWeight: 600, color: '#e8eaf0', marginTop: '4px' }}>Trading Intelligence</div>
@@ -38,7 +37,6 @@ export default function Sidebar({ email }: { email: string }) {
 
       <div style={{ height: '1px', background: '#1e2a40', margin: '0 16px' }} />
 
-      {/* Nav */}
       <nav style={{ padding: '16px 12px', flex: 1 }}>
         {navItems.map(item => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -67,9 +65,7 @@ export default function Sidebar({ email }: { email: string }) {
                 }}>
                   <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '12px' }}>{item.icon}</span>
                   {item.label}
-                  <span style={{ marginLeft: 'auto', fontFamily: 'Space Mono, monospace', fontSize: '9px', color: '#5a6480' }}>
-                    S{item.sprint}
-                  </span>
+                  <span style={{ marginLeft: 'auto', fontFamily: 'Space Mono, monospace', fontSize: '9px', color: '#5a6480' }}>S{item.sprint}</span>
                 </div>
               )}
             </div>
@@ -77,7 +73,6 @@ export default function Sidebar({ email }: { email: string }) {
         })}
       </nav>
 
-      {/* User */}
       <div style={{ padding: '16px', borderTop: '1px solid #1e2a40' }}>
         <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {email}
@@ -97,4 +92,5 @@ export default function Sidebar({ email }: { email: string }) {
     </aside>
   )
 }
+
 
