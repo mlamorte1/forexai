@@ -9,22 +9,44 @@ const CHAT_SYSTEM_PROMPT = `Eres ForexAI, un agente experto en trading de divisa
 
 Tienes acceso a:
 - Las tácticas de trading personales del usuario (Overnight Trade, Anchor Brake, News Trade, etc.)
-- Datos de mercado en tiempo real de Oanda
+- Datos de mercado en tiempo real de Oanda (ya incluidos en el contexto)
 - Conocimiento profundo de análisis técnico de price action
 
 Tu estilo de comunicación:
 - Directo, preciso, profesional
 - Respondes en español
 - Cuando analizas mercados, aplicas las tácticas específicas del usuario
-- Cuando hay dudas sobre una táctica, explicas el concepto claramente
-- Siempre incluyes disclaimers de que no es asesoría financiera cuando das señales específicas
+- SIEMPRE terminas un análisis con una conclusión clara y accionable
+
+REGLA CRÍTICA — CONCLUSIÓN OBLIGATORIA:
+Cuando el usuario pide analizar un par o un setup, SIEMPRE debes terminar con una sección llamada:
+
+## 🎯 CONCLUSIÓN
+
+Que incluya obligatoriamente:
+- **SEÑAL**: BUY / SELL / WAIT / SKIP
+- **Razón**: Una línea explicando por qué
+- Si es BUY o SELL:
+  - **Entry**: precio exacto
+  - **Stop Loss**: precio exacto + razón estructural
+  - **Take Profit**: precio exacto (achievable pips al siguiente barrier)
+  - **Confianza**: porcentaje
+  - **Acción**: "Colocar orden límite a las 7PM EST" o similar
+- Si es WAIT o SKIP:
+  - **Razón específica**: cuál regla del sistema no se cumple
+  - **Qué esperar**: qué condición haría que el trade sea válido
+
+NUNCA termines un análisis sin esta sección de conclusión.
+NUNCA preguntes "¿quieres que continúe?" — siempre completa el análisis hasta la conclusión.
 
 Puedes ayudar con:
-- Análisis de pares específicos usando las tácticas del usuario
+- Análisis completo de pares usando las tácticas del usuario
 - Explicar conceptos de sus tácticas (whitespace, anchor, wicks, etc.)
 - Revisar si un setup cumple las reglas del Overnight Trade u otras tácticas
 - Discutir el mercado actual y noticias relevantes
-- Responder preguntas sobre gestión de riesgo basada en sus reglas`
+- Responder preguntas sobre gestión de riesgo basada en sus reglas
+
+Disclaimer: No es asesoría financiera. Siempre usa tu propio criterio y gestión de riesgo.`
 
 export async function POST(req: Request) {
   try {
@@ -37,34 +59,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
-    // Get oanda config
     const { data: cfg } = await supabase
       .from('oanda_configs')
       .select('api_key, account_id, environment')
       .eq('user_id', user.id)
       .single()
 
-    // Get relevant tactics
     const lastMessage = messages[messages.length - 1]?.content || ''
     const tactics = await matchTactics(supabase, user.id, lastMessage)
 
-    // Optionally fetch current candles for context
     let marketContext = ''
-    if (pair && cfg) {
+    const activePair = pair || 'EUR_USD'
+    if (cfg) {
       try {
-        const [D, H4] = await Promise.all([
-          fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 10),
-          fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 20),
+        const [W, D, H4, H1] = await Promise.all([
+          fetchCandles(cfg.api_key, cfg.environment, activePair, 'W', 20),
+          fetchCandles(cfg.api_key, cfg.environment, activePair, 'D', 30),
+          fetchCandles(cfg.api_key, cfg.environment, activePair, 'H4', 50),
+          fetchCandles(cfg.api_key, cfg.environment, activePair, 'H1', 30),
         ])
-        const lastH4 = H4[H4.length - 1]
-        const lastD = D[D.length - 1]
-        if (lastH4) {
-          marketContext = `\nDATO ACTUAL ${pair.replace('_', '/')}: H4 último precio: O:${lastH4.o} H:${lastH4.h} L:${lastH4.l} C:${lastH4.c} | D último: C:${lastD?.c}`
-        }
-      } catch {}
+
+        const recentH4 = H4.slice(-10).map((c: any) => `${c.t.slice(0,16)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
+        const recentD = D.slice(-10).map((c: any) => `${c.t.slice(0,10)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
+        const recentW = W.slice(-5).map((c: any) => `${c.t.slice(0,10)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
+        const lastH1 = H1[H1.length - 1]
+
+        marketContext = `
+
+=== DATOS DE MERCADO EN TIEMPO REAL: ${activePair.replace('_', '/')} ===
+
+WEEKLY (últimas 5 velas):
+${recentW}
+
+DAILY (últimas 10 velas):
+${recentD}
+
+H4 (últimas 10 velas — entry timeframe):
+${recentH4}
+
+PRECIO ACTUAL: ${lastH1?.c || '—'}
+HORA PANAMA: ${new Date().toLocaleString('es-PA', { timeZone: 'America/Panama' })}
+
+USA ESTOS DATOS REALES para tu análisis. No uses datos hipotéticos.
+Aplica el checklist de Overnight Trade completo y SIEMPRE termina con la sección ## 🎯 CONCLUSIÓN.`
+      } catch {
+        marketContext = '\n[Error obteniendo datos de mercado]'
+      }
     }
 
-    // Build system with tactics context
     const systemWithContext = `${CHAT_SYSTEM_PROMPT}
 
 === TÁCTICAS DEL USUARIO ===
@@ -73,21 +115,14 @@ ${marketContext}`
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      max_tokens: 2000,
       system: systemWithContext,
-      messages: messages.map((m: any) => ({
-        role: m.role,
-        content: m.content,
-      }))
+      messages: messages.map((m: any) => ({ role: m.role, content: m.content }))
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
 
-    // Save session
-    const updatedMessages = [
-      ...messages,
-      { role: 'assistant', content: reply }
-    ]
+    const updatedMessages = [...messages, { role: 'assistant', content: reply }]
 
     await supabase
       .from('chat_sessions')
@@ -103,7 +138,6 @@ ${marketContext}`
   }
 }
 
-// GET — load chat history
 export async function GET() {
   try {
     const supabase = createClient()
