@@ -8,8 +8,8 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈', sprint: 1 },
   { href: '/market', label: 'Mercado', icon: '◐', sprint: 1 },
   { href: '/tactics', label: 'Mis Tácticas', icon: '◉', sprint: 1 },
+  { href: '/chat', label: 'Chat Agente', icon: '◎', sprint: 1 },
   { href: '/settings', label: 'Configuración', icon: '⚙', sprint: 1 },
-  { href: '/chat', label: 'Chat Agente', icon: '◎', sprint: 3 },
   { href: '/alerts', label: 'Alertas', icon: '◆', sprint: 5 },
 ]
 
@@ -65,7 +65,7 @@ export default function Sidebar({ email }: { email: string }) {
                 }}>
                   <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '12px' }}>{item.icon}</span>
                   {item.label}
-                  <span style={{ marginLeft: 'auto', fontFamily: 'Space Mono, monospace', fontSize: '9px', color: '#5a6480' }}>S{item.sprint}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: 'Space Mono, monospace', fontSize: '9px' }}>S{item.sprint}</span>
                 </div>
               )}
             </div>
