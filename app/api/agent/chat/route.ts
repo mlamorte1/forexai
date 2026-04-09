@@ -8,8 +8,8 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const CHAT_SYSTEM_PROMPT = `Eres ForexAI, un agente experto en trading de divisas y asistente personal de trading.
 
 Tienes acceso a:
-- Las tácticas de trading personales del usuario (Overnight Trade, Anchor Brake, News Trade, etc.)
-- Datos de mercado en tiempo real de Oanda (ya incluidos en el contexto)
+- Las tácticas de trading personales del usuario (Overnight Trade, Anchor Break, News Trade, etc.)
+- Datos de mercado en tiempo real de Oanda (ya incluidos en el contexto para TODOS los pares)
 - Conocimiento profundo de análisis técnico de price action
 
 Tu estilo de comunicación:
@@ -19,7 +19,7 @@ Tu estilo de comunicación:
 - SIEMPRE terminas un análisis con una conclusión clara y accionable
 
 REGLA CRÍTICA — CONCLUSIÓN OBLIGATORIA:
-Cuando el usuario pide analizar un par o un setup, SIEMPRE debes terminar con una sección llamada:
+Cuando el usuario pide analizar un par o setup, SIEMPRE debes terminar con:
 
 ## 🎯 CONCLUSIÓN
 
@@ -31,20 +31,21 @@ Que incluya obligatoriamente:
   - **Stop Loss**: precio exacto + razón estructural
   - **Take Profit**: precio exacto (achievable pips al siguiente barrier)
   - **Confianza**: porcentaje
-  - **Acción**: "Colocar orden límite a las 7PM EST" o similar
+  - **Acción**: cuándo y cómo colocar la orden
 - Si es WAIT o SKIP:
   - **Razón específica**: cuál regla del sistema no se cumple
   - **Qué esperar**: qué condición haría que el trade sea válido
 
 NUNCA termines un análisis sin esta sección de conclusión.
 NUNCA preguntes "¿quieres que continúe?" — siempre completa el análisis hasta la conclusión.
+NUNCA digas "necesito los candles de X" — los datos de TODOS los pares ya están en el contexto.
 
 Puedes ayudar con:
 - Análisis completo de pares usando las tácticas del usuario
 - Explicar conceptos de sus tácticas (whitespace, anchor, wicks, etc.)
-- Revisar si un setup cumple las reglas del Overnight Trade u otras tácticas
+- Revisar si un setup cumple las reglas del Overnight Trade, Anchor Break u otras tácticas
 - Discutir el mercado actual y noticias relevantes
-- Responder preguntas sobre gestión de riesgo basada en sus reglas
+- Responder preguntas sobre gestión de riesgo
 
 Disclaimer: No es asesoría financiera. Siempre usa tu propio criterio y gestión de riesgo.`
 
@@ -59,52 +60,77 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
+    // Get oanda config
     const { data: cfg } = await supabase
       .from('oanda_configs')
       .select('api_key, account_id, environment')
       .eq('user_id', user.id)
       .single()
 
+    // Get relevant tactics
     const lastMessage = messages[messages.length - 1]?.content || ''
     const tactics = await matchTactics(supabase, user.id, lastMessage)
 
+    // Get ALL watched pairs
+    const { data: watchedPairs } = await supabase
+      .from('watched_pairs')
+      .select('pair')
+      .eq('user_id', user.id)
+      .eq('active', true)
+
+    // Build market context for ALL pairs
     let marketContext = ''
-    const activePair = pair || 'EUR_USD'
-    if (cfg) {
-      try {
-        const [W, D, H4, H1] = await Promise.all([
-          fetchCandles(cfg.api_key, cfg.environment, activePair, 'W', 20),
-          fetchCandles(cfg.api_key, cfg.environment, activePair, 'D', 30),
-          fetchCandles(cfg.api_key, cfg.environment, activePair, 'H4', 50),
-          fetchCandles(cfg.api_key, cfg.environment, activePair, 'H1', 30),
-        ])
 
-        const recentH4 = H4.slice(-10).map((c: any) => `${c.t.slice(0,16)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
-        const recentD = D.slice(-10).map((c: any) => `${c.t.slice(0,10)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
-        const recentW = W.slice(-5).map((c: any) => `${c.t.slice(0,10)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`).join('\n')
-        const lastH1 = H1[H1.length - 1]
+    if (cfg && watchedPairs && watchedPairs.length > 0) {
+      const allPairs = watchedPairs.map((p: any) => p.pair)
 
-        marketContext = `
+      // Add selected pair if not already in watched pairs
+      if (pair && !allPairs.includes(pair)) allPairs.unshift(pair)
 
-=== DATOS DE MERCADO EN TIEMPO REAL: ${activePair.replace('_', '/')} ===
+      const pairDataSections: string[] = []
 
-WEEKLY (últimas 5 velas):
-${recentW}
+      // Fetch candles for all pairs in parallel
+      await Promise.all(allPairs.map(async (p: string) => {
+        try {
+          const [W, D, H4, H1] = await Promise.all([
+            fetchCandles(cfg.api_key, cfg.environment, p, 'W', 10),
+            fetchCandles(cfg.api_key, cfg.environment, p, 'D', 20),
+            fetchCandles(cfg.api_key, cfg.environment, p, 'H4', 30),
+            fetchCandles(cfg.api_key, cfg.environment, p, 'H1', 20),
+          ])
 
-DAILY (últimas 10 velas):
-${recentD}
+          const fmtC = (c: any) => `${c.t.slice(0, 16)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`
+          const lastH1 = H1[H1.length - 1]
 
-H4 (últimas 10 velas — entry timeframe):
-${recentH4}
+          pairDataSections.push(`
+--- ${p.replace('_', '/')} ---
+Precio actual: ${lastH1?.c || '—'}
 
-PRECIO ACTUAL: ${lastH1?.c || '—'}
-HORA PANAMA: ${new Date().toLocaleString('es-PA', { timeZone: 'America/Panama' })}
+Weekly (últimas 5):
+${W.slice(-5).map(fmtC).join('\n')}
 
-USA ESTOS DATOS REALES para tu análisis. No uses datos hipotéticos.
-Aplica el checklist de Overnight Trade completo y SIEMPRE termina con la sección ## 🎯 CONCLUSIÓN.`
-      } catch {
-        marketContext = '\n[Error obteniendo datos de mercado]'
-      }
+Daily (últimas 10):
+${D.slice(-10).map(fmtC).join('\n')}
+
+H4 (últimas 15):
+${H4.slice(-15).map(fmtC).join('\n')}
+
+H1 (últimas 10):
+${H1.slice(-10).map(fmtC).join('\n')}`)
+        } catch {
+          pairDataSections.push(`\n--- ${p.replace('_', '/')} ---\n[Error obteniendo datos]`)
+        }
+      }))
+
+      marketContext = `
+
+=== DATOS DE MERCADO EN TIEMPO REAL (TODOS LOS PARES) ===
+Hora Panama: ${new Date().toLocaleString('es-PA', { timeZone: 'America/Panama' })}
+
+${pairDataSections.join('\n')}
+
+IMPORTANTE: Tienes datos reales de TODOS los pares listados arriba.
+Usa estos datos para tu análisis. NUNCA digas que no tienes datos de un par.`
     }
 
     const systemWithContext = `${CHAT_SYSTEM_PROMPT}
