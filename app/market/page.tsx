@@ -311,9 +311,9 @@ export default function MarketPage() {
                 {positions.map((p: any) => {
                   const longUnits = parseFloat(p.long?.units || 0)
                   const shortUnits = parseFloat(p.short?.units || 0)
-                  const units = longUnits !== 0 ? longUnits : shortUnits
-                  const side = longUnits !== 0 ? 'LONG' : 'SHORT'
-                  const pnl = fmtPnl(p.unrealizedPL)
+                  const units = parseFloat(t.currentUnits) || parseFloat(t.initialUnits)
+const side = units > 0 ? 'LONG' : 'SHORT'
+const pnl = fmtPnl(t.realizedPL ?? t.unrealizedPL)
                   return (
                     <tr key={p.instrument} onClick={() => setPair(p.instrument)} style={{ cursor: 'pointer' }}>
                       <td style={{ padding: '11px 18px', ...mono, fontSize: '12px', color: '#e8eaf0', borderBottom: '1px solid rgba(30,42,64,.4)' }}>{p.instrument.replace('_', '/')}</td>
