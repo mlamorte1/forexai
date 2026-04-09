@@ -20,7 +20,7 @@ export async function GET() {
       : 'https://api-fxpractice.oanda.com'
 
     const res = await fetch(
-      `${base}/v3/accounts/${cfg.account_id}/trades?count=15`,
+      `${base}/v3/accounts/${cfg.account_id}/trades?state=CLOSED&count=20`,
       { headers: { Authorization: `Bearer ${cfg.api_key}` } }
     )
 
