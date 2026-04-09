@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { sendAlertEmail } from '@/lib/resend'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { searchParams } = new URL(req.url)
+    const email = searchParams.get('email')
+
+    if (!email) {
+      return NextResponse.json({ error: 'Agrega ?email=tu@email.com a la URL' })
+    }
 
     const testAnalysis = {
       signal: 'BUY',
@@ -22,9 +24,9 @@ export async function GET() {
       reasoning: 'TEST EMAIL — Setup de Overnight Trade detectado en AUD/USD. Uptrend confirmado en Daily con action candles rojas indicando retroceso. Zona de demanda fresca identificada con whitespace de calidad (wick against wall) en el 65% medio del anchor. Wicks odd count (3) confirmando unfilled orders. Stop protegido detrás del pivot en 0.6318. Target en siguiente barrier con ~54 pips alcanzables.',
     }
 
-    await sendAlertEmail({ to: user.email!, analysis: testAnalysis })
+    await sendAlertEmail({ to: email, analysis: testAnalysis })
 
-    return NextResponse.json({ ok: true, sent_to: user.email })
+    return NextResponse.json({ ok: true, sent_to: email })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
