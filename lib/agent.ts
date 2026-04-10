@@ -14,12 +14,16 @@ Tu especialidad es el análisis multi-timeframe usando los siguientes conceptos 
 - Zone location dentro del anchor (preferir 70% medio)
 - Nivel fresco y auténtico (wall a la izquierda, sin price action a la derecha)
 
+ESTRATEGIAS DISPONIBLES:
+1. Overnight Trade — válida SOLO después de las 7PM EST. Busca setups para ejecutar durante la sesión overnight.
+2. Anchor Break — válida las 24 horas. Busca rupturas de anchor con confirmación de action candles.
+
 REGLAS DE TRADING QUE SIEMPRE SIGUES:
 - Solo señalar oportunidades con alta convicción (≥70% confidence)
 - NUNCA poner stop en whitespace — siempre detrás de un pivot estructural
 - Target: achievable pips al siguiente barrier (no home runs)
 - Skip si: even wicks, sideways anchor, zona en borde del anchor, HTF Supply/Demand en contra, ATR ya consumido, interest rate news overnight
-- Considerar sesión actual: overnight trades se ejecutan después de las 7PM EST
+- Aplica la estrategia correcta según el contexto de hora indicado en cada análisis
 
 CUANDO ANALICES:
 1. Determina el trend en Daily usando candle bodies
@@ -63,6 +67,18 @@ export async function runForexAgent({
   tactics: string
   minConfidence: number
 }) {
+  // Determinar hora EST y estrategia aplicable
+  const nyHour = parseInt(new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    hour12: false
+  }))
+  const isOvernightWindow = nyHour >= 19
+
+  const strategyContext = isOvernightWindow
+    ? 'Estás en ventana overnight (después de 7PM EST). Aplica AMBAS estrategias: Overnight Trade y Anchor Break. Prioriza Overnight Trade si hay setup válido.'
+    : 'Estás fuera de ventana overnight (antes de 7PM EST). Aplica SOLO la estrategia Anchor Break.'
+
   const userMessage = `
 ANÁLISIS REQUERIDO PARA: ${pair.replace('_', '/')}
 
@@ -88,9 +104,12 @@ ${news || 'No se encontraron noticias relevantes'}
 ${tactics || 'No hay tácticas guardadas'}
 
 === HORA ACTUAL ===
-${new Date().toLocaleString('es-PA', { timeZone: 'America/Panama' })} (Panama / EST)
+${new Date().toLocaleString('es-US', { timeZone: 'America/New_York' })} (New York EST)
 
-Con base en toda esta información, aplica el sistema de Overnight Trade y genera tu análisis completo en JSON.
+=== INSTRUCCIÓN DE ESTRATEGIA ===
+${strategyContext}
+
+Genera tu análisis completo en JSON.
 La confianza mínima para enviar alerta es ${minConfidence}%.
 Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal: "WAIT", send_alert: false.
 `
@@ -103,9 +122,11 @@ Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
-  const clean = text.replace(/```json|```/g, '').trim()
 
   try {
+    // Intenta extraer JSON con regex primero
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    const clean = jsonMatch ? jsonMatch[0] : text.replace(/```json|```/g, '').trim()
     const result = JSON.parse(clean)
     result.send_alert = result.signal !== 'WAIT' && result.confidence >= minConfidence
     return result
