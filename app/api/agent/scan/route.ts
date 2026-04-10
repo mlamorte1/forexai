@@ -100,12 +100,14 @@ export async function GET(req: Request) {
 
             return { pair, signal: analysis.signal, confidence: analysis.confidence, sent: analysis.send_alert }
           } catch (pairErr: any) {
+            console.error(`[SCAN ERROR] pair=${pair}`, pairErr)
             return { pair, error: pairErr.message }
           }
         }))
 
         return pairResults
       } catch (userErr: any) {
+        console.error(`[SCAN ERROR] user=${cfg.user_id}`, userErr)
         return [{ user_id: cfg.user_id, error: userErr.message }]
       }
     }))
