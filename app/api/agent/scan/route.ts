@@ -60,7 +60,9 @@ export async function GET(req: Request) {
         const positions = positionsRaw.positions || []
 
         // ✅ News cache por moneda única
-        const currencies = [...new Set(pairs.flatMap(({ pair }: { pair: string }) => pair.split('_')))]
+        const currencySet = new Set<string>()
+pairs.forEach(({ pair }: { pair: string }) => pair.split('_').forEach((c: string) => currencySet.add(c)))
+const currencies = Array.from(currencySet)
         const newsCache: Record<string, string> = {}
         await Promise.all(currencies.map(async (currency: string) => {
           newsCache[currency] = await fetchNews(currency)
