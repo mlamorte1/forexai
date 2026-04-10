@@ -10,7 +10,7 @@ const navItems = [
   { href: '/tactics', label: 'Mis Tácticas', icon: '◉', sprint: 1 },
   { href: '/chat', label: 'Chat Agente', icon: '◎', sprint: 1 },
   { href: '/settings', label: 'Configuración', icon: '⚙', sprint: 1 },
-  { href: '/alerts', label: 'Alertas', icon: '◆', sprint: 5 },
+  { href: '/alerts', label: 'Alertas', icon: '◆', sprint: 1 },
 ]
 
 export default function Sidebar({ email }: { email: string }) {
