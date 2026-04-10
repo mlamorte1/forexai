@@ -46,28 +46,27 @@ export async function GET(req: Request) {
 
         if (!user?.email || !pairs || pairs.length === 0) return []
         const userEmail = user.email
-        
+
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
 
         // ✅ TODOS los pares en paralelo
         const pairResults = await Promise.all(pairs.map(async ({ pair }) => {
           try {
-            const tacticsQuery = `Overnight trade setup for ${pair} - trend analysis whitespace anchor`
+            const tacticsQuery = `Anchor Break setup ${pair} - HTF trend supply demand M30 M5 entry`
 
-            // ✅ Velas + news + tactics todo en paralelo
-            const [W, D, H4, H1, news, tactics] = await Promise.all([
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'W', 20),
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 30),
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 50),
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'H1', 50),
+            // ✅ Velas H3/M30/M5 + news + tactics todo en paralelo
+            const [H3, M30, M5, news, tactics] = await Promise.all([
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 50),   // HTF: trend + S/D zones
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 100), // ITF: Anchor Break identification
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 100),  // LTF: entry anchor + stop
               fetchNews(pair),
               matchTactics(supabase, cfg.user_id, tacticsQuery),
             ])
 
             const analysis = await runForexAgent({
               pair,
-              candles: { W, D, H4, H1 },
+              candles: { H3, M30, M5 },
               positions,
               news,
               tactics,
@@ -82,7 +81,7 @@ export async function GET(req: Request) {
               entry: analysis.entry || null,
               stop_loss: analysis.stop_loss || null,
               take_profit: analysis.take_profit || null,
-              timeframe: analysis.timeframe || 'H4',
+              timeframe: analysis.timeframe || 'M30',
               reasoning: analysis.reasoning,
               email_sent: false,
             })
