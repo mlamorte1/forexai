@@ -67,6 +67,7 @@ PASO 6 — PROFIT POTENTIAL + RACE TRACK CHECK
   - Si hay Race Track entre entry y target → reducir el take profit al inicio del RT
 - Sin profit potential claro → WAIT
 
+
 TIPOS DE SETUPS:
 - SBUC → UTAB: Sideways Base Up Continuation → Up Trend Anchor Break
 - UTS → UTAB: Up Trend Setup → Up Trend Anchor Break
@@ -77,6 +78,10 @@ TIPOS DE SETUPS:
 
 3 TIPOS DE ENTRY (evalúa cuál aplica):
 1. PULLBACK: esperar que el precio regrese al nivel roto antes de entrar — más conservador
+IMPORTANTE: El entry de pullback NO es el precio actual. Es el nivel específico al que 
+   esperas que el precio REGRESE antes de entrar. Si el precio ya pasó el nivel roto y está 
+   arriba, el entry de pullback debe ser un nivel INFERIOR al precio actual — el nivel roto 
+   que ahora actuará como soporte. NUNCA reportes el precio actual como entry de pullback.
 2. BREAKOUT: entrar en el momento del break directo — más agresivo
 3. CC (Corrective Candle) en menor TF: esperar la vela correctiva en M5 o M1 — más preciso
 
@@ -202,6 +207,9 @@ Sigue los 6 pasos de Jody en orden. En el paso 6 verifica explícitamente si hay
 Identifica el tipo de entry óptimo (pullback / breakout / CC).
 Verifica si aplica CC & AB Continued Trend en lugar del AB estándar.
 Documenta todo en el campo "reasoning".
+CRÍTICO PARA ENTRY: El precio actual es el close de la última vela M5.
+Si entry_type es "pullback", el campo "entry" debe ser INFERIOR al precio actual para BUY, 
+o SUPERIOR para SELL. Nunca uses el precio actual como entry de pullback.
 Genera tu análisis completo en JSON.
 La confianza mínima para enviar alerta es ${minConfidence}%.
 Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal: "WAIT", send_alert: false.
