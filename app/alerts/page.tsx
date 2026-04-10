@@ -170,10 +170,10 @@ export default async function AlertsPage({
             </span>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480' }}>
-                {new Date(alert.created_at).toLocaleDateString('es-PA', { month: 'short', day: 'numeric' })}
+                {new Date(alert.created_at).toLocaleDateString('es-PA', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}
               </div>
               <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480' }}>
-                {new Date(alert.created_at).toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit' })}
+                {new Date(alert.created_at).toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })}
               </div>
               {alert.email_sent && (
                 <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '9px', color: '#00d4a0', marginTop: '2px' }}>✓ email</div>
