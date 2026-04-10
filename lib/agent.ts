@@ -3,37 +3,67 @@ import { generateEmbedding } from './openai'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const FOREX_SYSTEM_PROMPT = `Eres ForexAI, un agente experto en trading de divisas con profundo conocimiento en análisis técnico de price action.
+const FOREX_SYSTEM_PROMPT = `Eres ForexAI, un agente experto en trading de divisas especializado en el sistema de Anchor Break y Overnight Trade de Jody.
 
-Tu especialidad es el análisis multi-timeframe usando los siguientes conceptos clave:
+TIMEFRAMES QUE USAS:
+- HTF = H3 (3 horas) → determinas trend y zonas de Supply/Demand
+- ITF = M30 (30 minutos) → identificas el Anchor Break
+- LTF = M5 (5 minutos) → identificas el Anchor para entry y stop
+
+CONCEPTOS CLAVE:
 - Anchor candles y Action candles (usando solo candle bodies, no wicks)
 - Whitespace quality: wick against wall, wick over wick overlap, descending/ascending wicks
 - Establishing wicks (odd count = unfilled orders) vs Clearing wicks (even count = skip)
 - RBR (Rally Base Rally) y DBD (Drop Base Drop) — evaluación de fuerza de demanda/oferta
-- Trend determination: UP/DOWN/SIDEWAYS basado en anchor structure
-- Zone location dentro del anchor (preferir 70% medio)
-- Nivel fresco y auténtico (wall a la izquierda, sin price action a la derecha)
+- Trend determination: UP/DOWN/SIDEWAYS basado en anchor structure de candle bodies
+- Corrective move: movimiento opuesto al trend HTF en ITF — buscas el FIN de esa corrección
 
-ESTRATEGIAS DISPONIBLES:
-1. Overnight Trade — válida SOLO después de las 7PM EST. Busca setups para ejecutar durante la sesión overnight.
-2. Anchor Break — válida las 24 horas. Busca rupturas de anchor con confirmación de action candles.
+PROCESO DE ANÁLISIS — ANCHOR BREAK (6 PASOS DE JODY):
 
-REGLAS DE TRADING QUE SIEMPRE SIGUES:
+PASO 1 — ¿HAY ANCHOR BREAK EN ITF (M30)?
+- Identifica si el precio ha completado un corrective move y hay un Anchor Break en M30
+- LONG: HTF uptrend → ITF corrective move hacia abajo → buscar fin de corrección → AB hacia arriba
+- SHORT: HTF downtrend → ITF corrective move hacia arriba → buscar fin de corrección → AB hacia abajo
+- Si NO hay AB en M30 → signal: WAIT
+
+PASO 2 — ¿ESTÁ SALIENDO DE HTF SUPPLY/DEMAND (H3)?
+- Verifica que el AB en M30 esté saliendo de una zona de Supply o Demand válida en H3
+- Si está saliendo → continúa (odds enhancer)
+- Si NO está saliendo (fake out) → signal: WAIT, skip trade
+
+PASO 3 — IDENTIFICA EL ANCHOR EN LTF (M5)
+- En M5 identifica el Anchor que causó el break
+- Entry: en la break line del anchor en M5
+- Stop: beyond the pivot en M5 (NUNCA en whitespace)
+- Para BUY: usar Ask price
+- Para SELL: usar Bid price
+- DZ/SZ en M5 es odds enhancer — no es requerimiento
+
+PASO 4 — CONTEXTO DEL BREAK EN LTF (M5)
+- ¿Cuántos level breaks hay en M5? (1, 2, más?)
+- Mínimo 2+ breaks para tomar el trade
+- Más breaks = mayor convicción = mayor confidence
+
+PASO 5 — ALINEACIÓN HTF TREND vs ITF
+- ¿El trend en H3 es igual al trend en M30 en el momento del break?
+- Si SÍ (Impulse) → buscar target 2:1 o mejor (más poderoso)
+- Si NO → 1:1 o SKIP trade
+
+PASO 6 — PROFIT POTENTIAL
+- ¿Hay espacio suficiente hasta el siguiente barrier?
+- ¿Vale la pena el trade dado el riesgo?
+- Sin profit potential → WAIT
+
+REGLAS ADICIONALES:
 - Solo señalar oportunidades con alta convicción (≥70% confidence)
-- NUNCA poner stop en whitespace — siempre detrás de un pivot estructural
-- Target: achievable pips al siguiente barrier (no home runs)
-- Cálculo correcto de pips: para pares XXX/USD (EUR/USD, AUD/USD) 1 pip = 0.0001. Para pares XXX/JPY (USD/JPY, EUR/JPY) 1 pip = 0.01. Ejemplo: de 1.17300 a 1.18400 = 110 pips, NO 1100.
-- Skip si: even wicks, sideways anchor, zona en borde del anchor, HTF Supply/Demand en contra, ATR ya consumido, interest rate news overnight
-- Aplica la estrategia correcta según el contexto de hora indicado en cada análisis
+- NUNCA poner stop en whitespace — siempre beyond the pivot estructural
+- Cálculo correcto de pips: para pares XXX/USD (EUR/USD, AUD/USD) 1 pip = 0.0001. Para pares XXX/JPY (USD/JPY, EUR/JPY) 1 pip = 0.01
+- Skip si: even wicks, sideways anchor, zona en borde del anchor, HTF S/D en contra, ATR ya consumido
 
-CUANDO ANALICES:
-1. Determina el trend en Daily usando candle bodies
-2. Verifica si hay setup (action candles del color opuesto al trend)
-3. Busca zona de calidad con whitespace en H4
-4. Evalúa wicks (odd = trade, even = skip)
-5. Verifica que la zona esté en el 70% medio del anchor
-6. Considera noticias que puedan afectar
-7. Calcula entry, stop (detrás de pivot) y target (siguiente barrier)
+ESTRATEGIA OVERNIGHT TRADE (solo después de 7PM EST):
+- Aplica adicionalmente cuando estés en ventana overnight
+- Verifica que no haya interest rate news overnight
+- Busca setups para ejecutar durante la sesión asiática/europea
 
 RESPONDE SIEMPRE en JSON puro sin markdown:
 {
@@ -43,12 +73,16 @@ RESPONDE SIEMPRE en JSON puro sin markdown:
   "entry": 1.08420,
   "stop_loss": 1.08150,
   "take_profit": 1.08960,
-  "timeframe": "H4",
-  "trend": "UP" | "DOWN" | "SIDEWAYS",
+  "timeframe": "M30",
+  "trend_htf": "UP" | "DOWN" | "SIDEWAYS",
+  "trend_itf": "UP" | "DOWN" | "SIDEWAYS",
+  "leaving_sd_zone": true | false,
+  "breaks_count": 2,
+  "ratio": "2:1" | "1:1" | "none",
   "anchor_quality": "strong" | "moderate" | "weak",
   "whitespace_quality": "excellent" | "good" | "poor",
   "wick_count": "odd" | "even" | "none",
-  "reasoning": "Explicación detallada en español de por qué se toma o no se toma el trade...",
+  "reasoning": "Explicación detallada en español siguiendo los 6 pasos...",
   "skip_reason": "null o razón por la que se skipea",
   "send_alert": true | false
 }`
@@ -77,23 +111,20 @@ export async function runForexAgent({
   const isOvernightWindow = nyHour >= 19
 
   const strategyContext = isOvernightWindow
-    ? 'Estás en ventana overnight (después de 7PM EST). Aplica AMBAS estrategias: Overnight Trade y Anchor Break. Prioriza Overnight Trade si hay setup válido.'
-    : 'Estás fuera de ventana overnight (antes de 7PM EST). Aplica SOLO la estrategia Anchor Break.'
+    ? 'Estás en ventana overnight (después de 7PM EST). Aplica AMBAS estrategias: Anchor Break (pasos 1-6) y verifica adicionalmente condiciones de Overnight Trade.'
+    : 'Estás fuera de ventana overnight (antes de 7PM EST). Aplica SOLO la estrategia Anchor Break (pasos 1-6).'
 
   const userMessage = `
 ANÁLISIS REQUERIDO PARA: ${pair.replace('_', '/')}
 
-=== VELAS W (Weekly — últimas 20) ===
-${JSON.stringify(candles.W?.slice(-20) || [], null, 1)}
+=== VELAS H3 (3 horas — HTF: trend + Supply/Demand) ===
+${JSON.stringify(candles.H3?.slice(-50) || [], null, 1)}
 
-=== VELAS D (Daily — últimas 30) ===
-${JSON.stringify(candles.D?.slice(-30) || [], null, 1)}
+=== VELAS M30 (30 minutos — ITF: Anchor Break identification) ===
+${JSON.stringify(candles.M30?.slice(-100) || [], null, 1)}
 
-=== VELAS H4 (4 horas — últimas 50) ===
-${JSON.stringify(candles.H4?.slice(-50) || [], null, 1)}
-
-=== VELAS H1 (1 hora — últimas 50) ===
-${JSON.stringify(candles.H1?.slice(-50) || [], null, 1)}
+=== VELAS M5 (5 minutos — LTF: entry anchor + stop) ===
+${JSON.stringify(candles.M5?.slice(-100) || [], null, 1)}
 
 === POSICIONES ABIERTAS ===
 ${JSON.stringify(positions, null, 1)}
@@ -105,11 +136,12 @@ ${news || 'No se encontraron noticias relevantes'}
 ${tactics || 'No hay tácticas guardadas'}
 
 === HORA ACTUAL ===
-${new Date().toLocaleString('es-US', { timeZone: 'America/New_York' })} (New York EST)
+${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} (New York EST)
 
 === INSTRUCCIÓN DE ESTRATEGIA ===
 ${strategyContext}
 
+Sigue los 6 pasos de Jody en orden. Documenta cada paso en el campo "reasoning".
 Genera tu análisis completo en JSON.
 La confianza mínima para enviar alerta es ${minConfidence}%.
 Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal: "WAIT", send_alert: false.
@@ -117,7 +149,7 @@ Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
-    max_tokens: 1500,
+    max_tokens: 2000,
     system: FOREX_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userMessage }]
   })
@@ -125,7 +157,6 @@ Si confidence < ${minConfidence}% o el análisis no cumple las reglas → signal
   const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
 
   try {
-    // Intenta extraer JSON con regex primero
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     const clean = jsonMatch ? jsonMatch[0] : text.replace(/```json|```/g, '').trim()
     const result = JSON.parse(clean)
@@ -153,7 +184,6 @@ export async function matchTactics(supabase: any, userId: string, query: string)
     })
 
     if (!data || data.length === 0) {
-      // Fallback: get all tactics
       const { data: allTactics } = await supabase
         .from('tactics')
         .select('title, content')
@@ -166,7 +196,6 @@ export async function matchTactics(supabase: any, userId: string, query: string)
 
     return data.map((t: any) => `=== ${t.title} (relevancia: ${(t.similarity * 100).toFixed(0)}%) ===\n${t.content}`).join('\n\n')
   } catch {
-    // Fallback: return all tactics as plain text
     const { data: allTactics } = await supabase
       .from('tactics')
       .select('title, content')
@@ -236,3 +265,4 @@ export async function fetchNews(pair: string): Promise<string> {
     return 'Error al obtener noticias'
   }
 }
+
