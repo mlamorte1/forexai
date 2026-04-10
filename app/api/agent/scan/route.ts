@@ -88,7 +88,7 @@ export async function GET(req: Request) {
             })
 
             if (analysis.send_alert) {
-              await sendAlertEmail({ to: user.email, analysis })
+              await sendAlertEmail({ to: userEmail, analysis })
               await supabase
                 .from('alerts')
                 .update({ email_sent: true })
