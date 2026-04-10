@@ -36,24 +36,102 @@ DOWNTREND:
 SETUPS VÁLIDOS: UTS/UTSAB/SBUC → LONG | DTS/DTSAB/SBDC → SHORT
 SKIP SI: UTNS o DTNS en HTF
 
-ANCHOR BREAK LONG (BUY):
-- HTF uptrend (UTS/UTSAB/SBUC) → M30 corrective move bajista (serie c<o) → fin corrección → AB arriba
-- Pivot Low: vela con "l" más bajo de la serie bajista en M30
-- AB válido: vela de ruptura cuyo "c" supera 2+ highs de las velas bajistas previas
-- Stop = Pivot Low "l" menos buffer (XXX/USD: 0.0003-0.0005 | XXX/JPY: 0.03-0.05)
+════════════════════════════════
+ANCHOR BREAK LONG (BUY)
+════════════════════════════════
+CONTEXTO:
+- HTF uptrend (UTS/UTSAB/SBUC) → M30 corrective move bajista → fin corrección → AB arriba
 - ASK price para BUY
-- Entry pullback: INFERIOR al precio actual — NUNCA el precio actual
 
-ANCHOR BREAK SHORT (SELL):
-- HTF downtrend (DTS/DTSAB/SBDC) → M30 corrective move alcista (serie c>o) → fin corrección → AB abajo
-- Pivot High: vela con "h" más alto de la serie alcista en M30
-- AB válido: vela de ruptura cuyo "c" rompe por debajo de 2+ lows de las velas alcistas previas
-- Stop = Pivot High "h" más buffer (XXX/USD: 0.0003-0.0005 | XXX/JPY: 0.03-0.05)
+QUÉ BUSCAR EN M30:
+1. Serie de velas BAJISTAS (c < o) consecutivas — corrective move CONTRA el HTF uptrend
+2. El precio deja de hacer nuevos lows — formación del PIVOT LOW
+
+3. PIVOT LOW:
+   - Es la vela con el valor "l" (low) más bajo de todo el corrective move
+   - Puede ser alcista (c > o) o bajista (c < o) — lo que importa es que tenga el low más extremo
+   - Es el punto estructural donde el corrective move termina y comienza el AB
+
+4. VELAS COMBINADAS — REGLA CRÍTICA:
+   - Velas consecutivas del mismo color SIN interrupción = se combinan como una sola vela de ruptura
+   - Ejemplo: 3 velas alcistas consecutivas sin ninguna bajista entre ellas = una sola acción de ruptura
+   - Esta vela combinada es la que debe superar 2+ highs del corrective move para confirmar el AB
+
+5. IDENTIFICACIÓN DEL ANCHOR BREAK:
+   - Toma los valores "h" (high) de las velas bajistas (c < o) del corrective move
+   - La vela combinada de ruptura es válida cuando su "c" final supera 2+ de esos highs previos
+   - Cuenta cuántos highs fueron superados = número de level breaks
+   - Mínimo 2 level breaks para considerar el AB válido
+
+6. ENTRY — 3 opciones en orden de precisión:
+   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
+   b. WICK DE LA VELA DE IMPULSO: el wick inferior de la vela de ruptura representa un micro-pullback
+      → entry en el low de ese wick — más preciso y mejor R:R
+   c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al high del corrective move (ahora soporte)
+      → entry INFERIOR al precio actual — NUNCA el precio actual
+
+7. STOP PLACEMENT:
+   - Identifica el Pivot Low: el candle con el valor "l" (low) más bajo del corrective move
+   - Stop = ese low value menos buffer
+   - Para XXX/USD: buffer = 0.0003-0.0005
+   - Para XXX/JPY: buffer = 0.03-0.05
+   - NUNCA en whitespace — siempre beyond the lowest wick
+
+8. TAKE PROFIT:
+   - El high más cercano alcanzado ANTES del corrective move actual
+   - El siguiente barrier visible en M30 — achievable pips
+   - NO buscar home runs
+
+════════════════════════════════
+ANCHOR BREAK SHORT (SELL)
+════════════════════════════════
+CONTEXTO:
+- HTF downtrend (DTS/DTSAB/SBDC) → M30 corrective move alcista → fin corrección → AB abajo
 - BID price para SELL
-- Entry pullback: SUPERIOR al precio actual — NUNCA el precio actual
 
-WHITESPACE:
-- Espacio limpio sin price action previa entre entry y target
+QUÉ BUSCAR EN M30:
+1. Serie de velas ALCISTAS (c > o) consecutivas — corrective move CONTRA el HTF downtrend
+2. El precio deja de hacer nuevos highs — formación del PIVOT HIGH
+
+3. PIVOT HIGH:
+   - Es la vela con el valor "h" (high) más alto de todo el corrective move
+   - Puede ser alcista (c > o) o bajista (c < o) — lo que importa es que tenga el high más extremo
+   - Es el punto estructural donde el corrective move termina y comienza el AB
+
+4. VELAS COMBINADAS — REGLA CRÍTICA:
+   - Velas consecutivas del mismo color SIN interrupción = se combinan como una sola vela de ruptura
+   - Ejemplo: 3 velas bajistas consecutivas sin ninguna alcista entre ellas = una sola acción de ruptura
+   - Esta vela combinada es la que debe romper por debajo de 2+ lows del corrective move para confirmar el AB
+
+5. IDENTIFICACIÓN DEL ANCHOR BREAK:
+   - Toma los valores "l" (low) de las velas alcistas (c > o) del corrective move
+   - La vela combinada de ruptura es válida cuando su "c" final rompe por debajo de 2+ de esos lows previos
+   - Cuenta cuántos lows fueron superados = número de level breaks
+   - Mínimo 2 level breaks para considerar el AB válido
+
+6. ENTRY — 3 opciones en orden de precisión:
+   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
+   b. WICK DE LA VELA DE IMPULSO: el wick superior de la vela de ruptura representa un micro-pullback
+      → entry en el high de ese wick — más preciso y mejor R:R
+   c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al low del corrective move (ahora resistencia)
+      → entry SUPERIOR al precio actual — NUNCA el precio actual
+
+7. STOP PLACEMENT:
+   - Identifica el Pivot High: el candle con el valor "h" (high) más alto del corrective move
+   - Stop = ese high value más buffer
+   - Para XXX/USD: buffer = 0.0003-0.0005
+   - Para XXX/JPY: buffer = 0.03-0.05
+   - NUNCA en whitespace — siempre beyond the highest wick
+
+8. TAKE PROFIT:
+   - El low más cercano alcanzado ANTES del corrective move actual
+   - El siguiente barrier visible en M30 — achievable pips
+   - NO buscar home runs
+
+════════════════════════════════
+WHITESPACE Y WICKS
+════════════════════════════════
+WHITESPACE: espacio limpio sin price action previa entre entry y target
 - Tipos de calidad: wick against wall, wick over wick overlap, descending/ascending wicks
 - Sin whitespace → SKIP
 
@@ -61,13 +139,15 @@ WICKS: ODD (impar) = establishing = órdenes sin llenar → TRADE | EVEN (par) =
 
 RACE TRACK: zona de impulso fuerte sin pausas — NO entrar breaking INTO RT → reducir TP o SKIP
 
-6 PASOS DE JODY (ANCHOR BREAK):
-PASO 1: ¿AB claro en M30? Serie bajista/alcista terminó → precio deja de hacer nuevos lows/highs → ruptura con 2+ level breaks. Si NO → WAIT
+════════════════════════════════
+6 PASOS DE JODY (ANCHOR BREAK)
+════════════════════════════════
+PASO 1: ¿AB claro en M30? Serie bajista/alcista terminó → Pivot Low/High formado → velas combinadas rompen 2+ niveles. Si NO → WAIT
 PASO 2: ¿Saliendo de HTF S/D (H3/H4)? Si NO → probable fake out → WAIT
-PASO 3: Identifica anchor en M5 en zona del Pivot Low/High. Entry en break line. Stop beyond pivot. Wicks ODD = trade, EVEN = skip
+PASO 3: Identifica anchor en M5 en zona del Pivot. Entry según las 3 opciones. Stop beyond pivot. Wicks ODD = trade, EVEN = skip
 PASO 4: ¿Cuántos level breaks en M5? Mínimo 2+. Más breaks = mayor confidence
 PASO 5: ¿Dirección del AB = trend HTF? Si SÍ (Impulse) → 2:1. Si NO → 1:1 o SKIP
-PASO 6: ¿Whitespace suficiente hasta barrier? ¿Race Track entre entry y target? RT → reducir TP. Sin profit potential → WAIT
+PASO 6: ¿Whitespace suficiente hasta barrier? ¿Race Track? RT → reducir TP. Sin profit potential → WAIT
 
 SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación
 
@@ -89,7 +169,7 @@ RESPONDE en JSON puro sin markdown, reasoning máximo 3 oraciones:
   "leaving_sd_zone": true | false,
   "breaks_count": 2,
   "ratio": "2:1" | "1:1" | "none",
-  "entry_type": "pullback" | "breakout" | "cc",
+  "entry_type": "breakout" | "wick_impulse" | "pullback",
   "race_track_risk": true | false,
   "whitespace_quality": "excellent" | "good" | "poor" | "none",
   "wick_count": "odd" | "even" | "none",
@@ -224,7 +304,7 @@ ${JSON.stringify(candles.M5?.slice(-24) || [], null, 1)}`
 
   const strategyInstruction = isOvernightWindow
     ? 'Aplica el sistema Overnight Trade. Sigue los 6 pasos en orden. Es después de 7PM EST — busca setups para sesión asiática/europea.'
-    : 'Aplica el sistema Anchor Break. Sigue los 6 pasos en orden. Verifica Race Track en paso 6. CRÍTICO: si entry_type="pullback", entry debe ser INFERIOR al precio actual para BUY, SUPERIOR para SELL.'
+    : 'Aplica el sistema Anchor Break. Sigue los 6 pasos en orden. Recuerda: velas consecutivas del mismo color sin interrupción = una sola vela de ruptura. Verifica Race Track en paso 6. CRÍTICO: si entry_type="pullback", entry debe ser INFERIOR al precio actual para BUY, SUPERIOR para SELL.'
 
   const userMessage = `
 ANÁLISIS PARA: ${pair.replace('_', '/')}
