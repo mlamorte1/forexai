@@ -285,12 +285,12 @@ export async function fetchCandles(
     if (!res.ok) return []
     const data = await res.json()
     return (data.candles || []).map((c: any) => ({
-      t: c.time,
-      o: parseFloat(c.mid.o),
-      h: parseFloat(c.mid.h),
-      l: parseFloat(c.mid.l),
-      c: parseFloat(c.mid.c),
-    }))
+  t: new Date(c.time).toLocaleString('en-US', { timeZone: 'America/New_York' }), // ← conversión aquí
+  o: parseFloat(c.mid.o),
+  h: parseFloat(c.mid.h),
+  l: parseFloat(c.mid.l),
+  c: parseFloat(c.mid.c),
+}))
   } catch { return [] }
 }
 
