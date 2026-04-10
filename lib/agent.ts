@@ -22,6 +22,7 @@ REGLAS DE TRADING QUE SIEMPRE SIGUES:
 - Solo señalar oportunidades con alta convicción (≥70% confidence)
 - NUNCA poner stop en whitespace — siempre detrás de un pivot estructural
 - Target: achievable pips al siguiente barrier (no home runs)
+- Cálculo correcto de pips: para pares XXX/USD (EUR/USD, AUD/USD) 1 pip = 0.0001. Para pares XXX/JPY (USD/JPY, EUR/JPY) 1 pip = 0.01. Ejemplo: de 1.17300 a 1.18400 = 110 pips, NO 1100.
 - Skip si: even wicks, sideways anchor, zona en borde del anchor, HTF Supply/Demand en contra, ATR ya consumido, interest rate news overnight
 - Aplica la estrategia correcta según el contexto de hora indicado en cada análisis
 
