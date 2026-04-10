@@ -15,11 +15,12 @@ export default async function AlertsPage({
   const offset = (page - 1) * pageSize
 
   let query = supabase
-    .from('alerts')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + pageSize - 1)
+  .from('alerts')
+  .select('*', { count: 'exact' })
+  .eq('user_id', user.id)
+  .in('signal', ['BUY', 'SELL'])
+  .order('created_at', { ascending: false })
+  .range(offset, offset + pageSize - 1)
 
   if (searchParams.pair) query = query.eq('pair', searchParams.pair)
   if (searchParams.signal) query = query.eq('signal', searchParams.signal)
@@ -63,7 +64,7 @@ export default async function AlertsPage({
           { label: 'Total Scans', value: String(total), color: '#e8eaf0' },
           { label: 'BUY', value: String(buys), color: '#00d4a0' },
           { label: 'SELL', value: String(sells), color: '#ff4d6a' },
-          { label: 'WAIT', value: String(waits), color: '#f0b429' },
+          { label: 'Emails Enviados', value: String(allAlerts?.filter(a => a.email_sent).length ?? 0), color: '#00d4a0' },
           { label: 'Confianza Prom.', value: `${avgConf}%`, color: '#e8eaf0' },
         ].map(stat => (
           <div key={stat.label} style={{
@@ -87,7 +88,7 @@ export default async function AlertsPage({
         display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap'
       }}>
         <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480', letterSpacing: '2px' }}>FILTRAR:</span>
-        {['', 'BUY', 'SELL', 'WAIT'].map(s => (
+        {['', 'BUY', 'SELL'].map(s => (
           <a key={s} href={`/alerts?${new URLSearchParams({ ...searchParams, signal: s, page: '1' }).toString()}`} style={{
             fontFamily: 'Space Mono, monospace', fontSize: '10px',
             padding: '4px 12px', borderRadius: '4px', textDecoration: 'none',
