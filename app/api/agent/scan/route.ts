@@ -45,7 +45,8 @@ export async function GET(req: Request) {
         ])
 
         if (!user?.email || !pairs || pairs.length === 0) return []
-
+        const userEmail = user.email
+        
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
 
