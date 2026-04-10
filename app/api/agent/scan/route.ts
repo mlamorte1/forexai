@@ -57,9 +57,9 @@ export async function GET(req: Request) {
 
             // ✅ Velas H3/M30/M5 + news + tactics todo en paralelo
             const [H3, M30, M5, news, tactics] = await Promise.all([
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 50),   // HTF: trend + S/D zones
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 100), // ITF: Anchor Break identification
-              fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 100),  // LTF: entry anchor + stop
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 50),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 100),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 100),
               fetchNews(pair),
               matchTactics(supabase, cfg.user_id, tacticsQuery),
             ])
@@ -73,28 +73,33 @@ export async function GET(req: Request) {
               minConfidence,
             })
 
-            await supabase.from('alerts').insert({
-              user_id: cfg.user_id,
-              pair,
-              signal: analysis.signal,
-              confidence: analysis.confidence,
-              entry: analysis.entry || null,
-              stop_loss: analysis.stop_loss || null,
-              take_profit: analysis.take_profit || null,
-              timeframe: analysis.timeframe || 'M30',
-              reasoning: analysis.reasoning,
-              email_sent: false,
-            })
+            // ✅ Insert y captura el id exacto del registro creado
+            const { data: insertedAlert } = await supabase
+              .from('alerts')
+              .insert({
+                user_id: cfg.user_id,
+                pair,
+                signal: analysis.signal,
+                confidence: analysis.confidence,
+                entry: analysis.entry || null,
+                stop_loss: analysis.stop_loss || null,
+                take_profit: analysis.take_profit || null,
+                timeframe: analysis.timeframe || 'M30',
+                reasoning: analysis.reasoning,
+                email_sent: false,
+              })
+              .select('id')
+              .single()
 
             if (analysis.send_alert) {
               await sendAlertEmail({ to: userEmail, analysis })
-              await supabase
-                .from('alerts')
-                .update({ email_sent: true })
-                .eq('user_id', cfg.user_id)
-                .eq('pair', pair)
-                .order('created_at', { ascending: false })
-                .limit(1)
+              // ✅ Update usando id exacto — nunca toca otros registros
+              if (insertedAlert?.id) {
+                await supabase
+                  .from('alerts')
+                  .update({ email_sent: true })
+                  .eq('id', insertedAlert.id)
+              }
             }
 
             return { pair, signal: analysis.signal, confidence: analysis.confidence, sent: analysis.send_alert }
