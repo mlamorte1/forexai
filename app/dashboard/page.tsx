@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import RunScanButton from './run-scan-button'
 
 async function getOandaData(apiKey: string, accountId: string, env: string) {
   const base = env === 'live'
@@ -203,6 +204,7 @@ export default async function DashboardPage() {
             ? `Agente activo · escaneando cada 15 min · entorno ${oandaConfig.environment.toUpperCase()}`
             : 'Agente inactivo · configura Oanda para activar'}
         </span>
+        {oandaConfig && <RunScanButton />}
         <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
       </div>
     </div>
