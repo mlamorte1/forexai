@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { runForexAgent, matchTactics, fetchCandles, fetchNews } from '@/lib/agent'
 import { sendAlertEmail } from '@/lib/resend'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(req: Request) {
   try {
