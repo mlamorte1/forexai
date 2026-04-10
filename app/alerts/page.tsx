@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import AlertRow from './alert-row'
 import Sidebar from '@/components/Sidebar'
 
 export default async function AlertsPage({
@@ -137,55 +138,7 @@ export default async function AlertsPage({
               <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'Space Mono, monospace', fontSize: '11px', color: '#5a6480' }}>
                 Sin alertas para este filtro
               </div>
-            ) : alerts.map(alert => (
-              <div key={alert.id} style={{
-                display: 'grid', gridTemplateColumns: '80px 110px 70px 80px 80px 80px 1fr 100px',
-                padding: '12px 20px', borderBottom: '1px solid rgba(30,42,64,0.5)',
-                alignItems: 'start'
-              }}>
-                <div style={{
-                  background: signalColor(alert.signal) + '18',
-                  color: signalColor(alert.signal),
-                  fontFamily: 'Space Mono, monospace', fontSize: '10px', fontWeight: 700,
-                  padding: '3px 8px', borderRadius: '4px', textAlign: 'center', width: 'fit-content'
-                }}>
-                  {alert.signal}
-                </div>
-                <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '12px', color: '#e8eaf0' }}>
-                  {alert.pair?.replace('_', '/')}
-                </span>
-                <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '12px', color: alert.confidence >= 70 ? '#00d4a0' : '#5a6480' }}>
-                  {alert.confidence}%
-                </span>
-                <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '11px', color: '#5a6480' }}>
-                  {alert.entry ? parseFloat(alert.entry).toFixed(4) : '—'}
-                </span>
-                <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '11px', color: '#ff4d6a' }}>
-                  {alert.stop_loss ? parseFloat(alert.stop_loss).toFixed(4) : '—'}
-                </span>
-                <span style={{ fontFamily: 'Space Mono, monospace', fontSize: '11px', color: '#00d4a0' }}>
-                  {alert.take_profit ? parseFloat(alert.take_profit).toFixed(4) : '—'}
-                </span>
-                <span style={{
-                  fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480',
-                  lineHeight: '1.5', paddingRight: '16px',
-                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                }}>
-                  {alert.reasoning || '—'}
-                </span>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480' }}>
-                    {new Date(alert.created_at).toLocaleDateString('es-PA', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}
-                  </div>
-                  <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '10px', color: '#5a6480' }}>
-                    {new Date(alert.created_at).toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })}
-                  </div>
-                  {alert.email_sent && (
-                    <div style={{ fontFamily: 'Space Mono, monospace', fontSize: '9px', color: '#00d4a0', marginTop: '2px' }}>✓ email</div>
-                  )}
-                </div>
-              </div>
-            ))}
+            ) : alerts.map(alert => <AlertRow key={alert.id} alert={alert} />)}
           </div>
 
           {/* Pagination */}
