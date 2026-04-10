@@ -30,7 +30,7 @@ export default async function AlertsPage({
   // Stats
   const { data: allAlerts } = await supabase
     .from('alerts')
-    .select('signal, confidence')
+    .select('signal, confidence, email_sent')
     .eq('user_id', user.id)
 
   const total = allAlerts?.length ?? 0
