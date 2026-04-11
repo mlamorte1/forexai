@@ -65,8 +65,8 @@ QUÉ BUSCAR EN M30:
 
 6. ENTRY — 3 opciones en orden de precisión:
    a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
-   b. WICK DE LA VELA DE IMPULSO: el wick inferior de la vela de ruptura representa un micro-pullback
-      → entry en el low de ese wick — más preciso y mejor R:R
+   b. WICK EN M5 (wick_impulse): bajar a M5 dentro de la vela de impulso del M30 → identificar el anchor
+      en M5 → entry en la break line de ese anchor → stop cubre el pivot en M5 — más preciso y mejor R:R
    c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al high del corrective move (ahora soporte)
       → entry INFERIOR al precio actual — NUNCA el precio actual
 
@@ -111,8 +111,8 @@ QUÉ BUSCAR EN M30:
 
 6. ENTRY — 3 opciones en orden de precisión:
    a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
-   b. WICK DE LA VELA DE IMPULSO: el wick superior de la vela de ruptura representa un micro-pullback
-      → entry en el high de ese wick — más preciso y mejor R:R
+   b. WICK EN M5 (wick_impulse): bajar a M5 dentro de la vela de impulso del M30 → identificar el anchor
+      en M5 → entry en la break line de ese anchor → stop cubre el pivot en M5 — más preciso y mejor R:R
    c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al low del corrective move (ahora resistencia)
       → entry SUPERIOR al precio actual — NUNCA el precio actual
 
@@ -144,10 +144,17 @@ RACE TRACK: zona de impulso fuerte sin pausas — NO entrar breaking INTO RT →
 ════════════════════════════════
 PASO 1: ¿AB claro en M30? Serie bajista/alcista terminó → Pivot Low/High formado → velas combinadas rompen 2+ niveles. Si NO → WAIT
 PASO 2: ¿Saliendo de HTF S/D (H3/H4)? Si NO → probable fake out → WAIT
-PASO 3: Identifica anchor en M5 en zona del Pivot. Entry según las 3 opciones. Stop beyond pivot. Wicks ODD = trade, EVEN = skip
+PASO 3: Baja a M5 en la zona del Pivot Low/High del M30. Identifica el anchor en M5. Entry en la break line del anchor M5. Stop cubre el pivot en M5. Wicks ODD = trade, EVEN = skip
 PASO 4: ¿Cuántos level breaks en M5? Mínimo 2+. Más breaks = mayor confidence
 PASO 5: ¿Dirección del AB = trend HTF? Si SÍ (Impulse) → 2:1. Si NO → 1:1 o SKIP
 PASO 6: ¿Whitespace suficiente hasta barrier? ¿Race Track? RT → reducir TP. Sin profit potential → WAIT
+
+CRÍTICO — FRESCURA DEL ANÁLISIS:
+- Analiza ÚNICAMENTE el Anchor Break más reciente en los datos de M30
+- Si hay múltiples ABs en las velas disponibles, reporta SOLO el último
+- El AB debe estar en las últimas 3 velas de M30 (últimos 90 minutos) para ser válido
+- Si el AB más reciente ocurrió hace más de 3 velas M30 → WAIT
+- No reportar setups históricos aunque sean perfectos técnicamente
 
 SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación
 
@@ -443,5 +450,4 @@ export async function fetchNews(currency: string): Promise<string> {
     return ''
   }
 }
-
 
