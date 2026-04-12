@@ -16,8 +16,17 @@ export async function GET(req: Request) {
     const now = new Date()
     const nyHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }))
     const nyMinute = now.getMinutes()
+    const nyDay = now.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
     const isOvernightWindow = nyHour >= 19
     const isMarketHours = nyHour >= 8 && nyHour < 17
+
+    // ✅ Mercado cerrado: viernes después de 5PM hasta domingo 5PM EST
+    const isFridayAfterClose = nyDay === 'Friday' && nyHour >= 17
+    const isSaturdayAllDay = nyDay === 'Saturday'
+    const isSundayBeforeOpen = nyDay === 'Sunday' && nyHour < 17
+    if (isFridayAfterClose || isSaturdayAllDay || isSundayBeforeOpen) {
+      return NextResponse.json({ ok: true, message: 'Market closed — weekend skip' })
+    }
 
     // ✅ Cron inteligente: fuera de horario solo correr en :00 y :30
     if (!isMarketHours && !isOvernightWindow && nyMinute !== 0 && nyMinute !== 30) {
