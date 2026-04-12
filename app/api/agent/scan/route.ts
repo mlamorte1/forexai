@@ -108,6 +108,21 @@ const currencies = Array.from(currencySet)
                 }
               }
 
+              // ✅ Duplicate check — no enviar el mismo setup dos veces (ventana 2 horas)
+              const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+              const { data: recentAlertOT } = await supabase
+                .from('alerts')
+                .select('id')
+                .eq('user_id', cfg.user_id)
+                .eq('pair', pair)
+                .in('signal', ['BUY', 'SELL'])
+                .gte('created_at', twoHoursAgo)
+                .limit(1)
+                .maybeSingle()
+              if (recentAlertOT) {
+                return { pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }
+              }
+
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: true
               })
@@ -157,6 +172,21 @@ const currencies = Array.from(currencySet)
                 if (minutesAgo > 15) {
                   return { pair, signal: 'SKIP', reason: `Stale data: ${Math.round(minutesAgo)}min ago` }
                 }
+              }
+
+              // ✅ Duplicate check — no enviar el mismo setup dos veces (ventana 2 horas)
+              const twoHoursAgo2 = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+              const { data: recentAlertAB } = await supabase
+                .from('alerts')
+                .select('id')
+                .eq('user_id', cfg.user_id)
+                .eq('pair', pair)
+                .in('signal', ['BUY', 'SELL'])
+                .gte('created_at', twoHoursAgo2)
+                .limit(1)
+                .maybeSingle()
+              if (recentAlertAB) {
+                return { pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }
               }
 
               const analysis = await runForexAgent({
