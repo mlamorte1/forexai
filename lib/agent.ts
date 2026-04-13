@@ -424,30 +424,31 @@ export async function fetchCandles(
 
 export async function fetchNews(currency: string): Promise<string> {
   try {
-    const res = await fetch(`https://api.anthropic.com/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Latest forex news for ${currency} today. Interest rates, economic data, central bank. 3 bullet points max. Today: ${new Date().toDateString()}.`
-        }]
-      })
+    // ✅ Fetch ForexFactory calendar JSON — sin web_search, sin costo extra
+    const res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
+      headers: { 'User-Agent': 'ForexAI/1.0' }
+    })
+    if (!res.ok) return ''
+
+    const events = await res.json()
+    const today = new Date().toISOString().split('T')[0]
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
+    // Filtrar eventos de hoy y mañana para esta moneda, impacto medio-alto
+    const relevant = events.filter((e: any) => {
+      const eventDate = e.date?.split('T')[0]
+      const isCurrency = e.currency === currency
+      const isRelevant = eventDate === today || eventDate === tomorrow
+      const isImpactful = e.impact === 'High' || e.impact === 'Medium'
+      return isCurrency && isRelevant && isImpactful
     })
 
-    if (!res.ok) return ''
-    const data = await res.json()
-    const textBlocks = data.content?.filter((b: any) => b.type === 'text') || []
-    return textBlocks.map((b: any) => b.text).join('\n') || ''
+    if (relevant.length === 0) return ''
+
+    return relevant.slice(0, 3).map((e: any) =>
+      `• ${e.currency} ${e.impact} impact: ${e.title} — ${e.date?.split('T')[0]} ${e.time || ''}`
+    ).join('\n')
   } catch {
     return ''
   }
 }
-
