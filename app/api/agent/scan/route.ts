@@ -272,7 +272,7 @@ export async function GET(req: Request) {
               strategy,
               skip_reason: pairErr.message,
               reasoning: null,
-            }).then(() => {}).catch((e: any) => console.error('[LOG CATCH ERROR]', e.message))
+            })
             return { pair, error: pairErr.message }
           }
         }))
