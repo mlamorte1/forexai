@@ -169,26 +169,29 @@ export async function GET(req: Request) {
                 return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
               }
 
-              const { data: insertedAlert } = await supabase
-                .from('alerts')
-                .insert({
-                  user_id: cfg.user_id, pair,
-                  signal: analysis.signal,
-                  confidence: analysis.confidence,
-                  entry: analysis.entry || null,
-                  stop_loss: analysis.stop_loss || null,
-                  take_profit: analysis.take_profit || null,
-                  timeframe: analysis.timeframe || 'H4',
-                  reasoning: analysis.reasoning,
-                  email_sent: false,
-                })
-                .select('id')
-                .single()
+              // ✅ Solo guardar en DB si hay señal real (no WAIT)
+              if (analysis.signal !== 'WAIT') {
+                const { data: insertedAlert } = await supabase
+                  .from('alerts')
+                  .insert({
+                    user_id: cfg.user_id, pair,
+                    signal: analysis.signal,
+                    confidence: analysis.confidence,
+                    entry: analysis.entry || null,
+                    stop_loss: analysis.stop_loss || null,
+                    take_profit: analysis.take_profit || null,
+                    timeframe: analysis.timeframe || 'H4',
+                    reasoning: analysis.reasoning,
+                    email_sent: false,
+                  })
+                  .select('id')
+                  .single()
 
-              if (analysis.send_alert) {
-                await sendAlertEmail({ to: userEmail, analysis })
-                if (insertedAlert?.id) {
-                  await supabase.from('alerts').update({ email_sent: true }).eq('id', insertedAlert.id)
+                if (analysis.send_alert) {
+                  await sendAlertEmail({ to: userEmail, analysis })
+                  if (insertedAlert?.id) {
+                    await supabase.from('alerts').update({ email_sent: true }).eq('id', insertedAlert.id)
+                  }
                 }
               }
 
@@ -225,26 +228,29 @@ export async function GET(req: Request) {
                 return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
               }
 
-              const { data: insertedAlert } = await supabase
-                .from('alerts')
-                .insert({
-                  user_id: cfg.user_id, pair,
-                  signal: analysis.signal,
-                  confidence: analysis.confidence,
-                  entry: analysis.entry || null,
-                  stop_loss: analysis.stop_loss || null,
-                  take_profit: analysis.take_profit || null,
-                  timeframe: analysis.timeframe || 'M30',
-                  reasoning: analysis.reasoning,
-                  email_sent: false,
-                })
-                .select('id')
-                .single()
+              // ✅ Solo guardar en DB si hay señal real (no WAIT)
+              if (analysis.signal !== 'WAIT') {
+                const { data: insertedAlert } = await supabase
+                  .from('alerts')
+                  .insert({
+                    user_id: cfg.user_id, pair,
+                    signal: analysis.signal,
+                    confidence: analysis.confidence,
+                    entry: analysis.entry || null,
+                    stop_loss: analysis.stop_loss || null,
+                    take_profit: analysis.take_profit || null,
+                    timeframe: analysis.timeframe || 'M30',
+                    reasoning: analysis.reasoning,
+                    email_sent: false,
+                  })
+                  .select('id')
+                  .single()
 
-              if (analysis.send_alert) {
-                await sendAlertEmail({ to: userEmail, analysis })
-                if (insertedAlert?.id) {
-                  await supabase.from('alerts').update({ email_sent: true }).eq('id', insertedAlert.id)
+                if (analysis.send_alert) {
+                  await sendAlertEmail({ to: userEmail, analysis })
+                  if (insertedAlert?.id) {
+                    await supabase.from('alerts').update({ email_sent: true }).eq('id', insertedAlert.id)
+                  }
                 }
               }
 
