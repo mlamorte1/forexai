@@ -164,6 +164,17 @@ export async function GET(req: Request) {
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: true
               })
 
+              // ✅ Log ALL results including WAIT for diagnostics
+              await supabase.from('scan_logs').insert({
+                user_id: cfg.user_id, pair,
+                signal: analysis.signal,
+                confidence: analysis.confidence || 0,
+                htf_state: analysis.market_state || null,
+                strategy: 'overnight_trade',
+                skip_reason: analysis.skip_reason || null,
+                reasoning: analysis.reasoning || null,
+              }).then(() => {}).catch(() => {})
+
               // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
                 return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
@@ -222,6 +233,17 @@ export async function GET(req: Request) {
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: false
               })
+
+              // ✅ Log ALL results including WAIT for diagnostics
+              await supabase.from('scan_logs').insert({
+                user_id: cfg.user_id, pair,
+                signal: analysis.signal,
+                confidence: analysis.confidence || 0,
+                htf_state: analysis.htf_state || null,
+                strategy: 'anchor_break',
+                skip_reason: analysis.skip_reason || null,
+                reasoning: analysis.reasoning || null,
+              }).then(() => {}).catch(() => {})
 
               // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
