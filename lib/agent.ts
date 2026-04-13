@@ -269,22 +269,40 @@ ZONA LOCATION: preferir 70% medio del anchor — evitar extremos (mayor riesgo)
 ════════════════════════════════
 TERCERA PARTE — ENTRY Y STOP
 ════════════════════════════════
-ENTRY:
-- Usar zona identificada en H4, pad by spread
-- Box 120% ATR sobre los UFOs para dimensionar la zona
-- Check 100% Daily ATR — ¿ya hizo su movimiento?
-- CRÍTICO: Si precio está 2+ ATR lejos del entry → NO entrar (no va a regresar)
+120% ATR BOX PLACEMENT:
+- Cubrir la mayor cantidad de whitespace posible (Look Left)
+- Idealmente 100% whitespace, mínimo 50%
+- Cubrir el move out
+- LONG (DZ): Entry = TOP del box | Stop = BOTTOM del box
+- SHORT (SZ): Entry = BOTTOM del box | Stop = TOP del box
+
+ENTRY — 3 opciones (en orden de probabilidad):
+a) S.E.T.: precio toca/cruza la línea de entry del box — más agresivo
+b) Market order: precio entra al box directamente
+c) CONFIRMATION ENTRY (highest probability):
+   - Precio entra al box + Color Change en H1/RTF
+   - LONG: Red-Blue-Red (RBR) inside/outside box
+   - SHORT: Blue-Red-Blue (BRB) inside/outside box
+   - Opciones de timing:
+     i) Color change DENTRO del box → más agresivo, mayor riesgo
+     ii) Color change ROMPE el box → intermedio
+     iii) Color change CONFIRMA FUERA del box → más conservador, highest probability
 - Para BUY usar ASK price | Para SELL usar BID price
+- Pad entry by spread
+- CRÍTICO: Si precio está 2+ ATR lejos del entry → NO entrar (no va a regresar)
+- Check 100% Daily ATR — ¿ya hizo su movimiento?
 
 STOP:
+- BOTTOM del box en DZ (LONG) | TOP del box en SZ (SHORT)
 - NUNCA en whitespace — stop destruido inmediatamente
-- Best protected BEHIND a pivot estructural
 - Si pivot > 60 pips → bajar a H1 para stop más cercano
 - Dar wiggle room más allá del pivot
+- Mover stop: mantener 100% ATR de distancia al precio actual en LTF/RTF
 
 TARGET:
 - Siguiente barrier en H4 — achievable pips
-- NO home runs — solo pips alcanzables overnight
+- NO home runs — solo pips alcanzables
+- ONCE GREEN NEVER RED — una vez en profit, no dejar que se convierta en pérdida
 
 ════════════════════════════════
 6 PASOS OVERNIGHT
@@ -325,6 +343,7 @@ RESPONDE en JSON puro sin markdown, reasoning máximo 3 oraciones:
   "basing_candle_quality": "strong" | "moderate" | "weak",
   "whitespace_quality": "excellent" | "good" | "poor" | "none",
   "wick_count": "odd" | "even" | "none",
+  "entry_type": "set" | "market" | "confirmation_inside" | "confirmation_break" | "confirmation_outside",
   "two_atr_rule": true | false,
   "htf_interference": true | false,
   "interest_rate_news": true | false,
