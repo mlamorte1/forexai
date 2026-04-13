@@ -101,16 +101,20 @@ export default function AlertRow({ alert }: { alert: any }) {
               </span>
             ) : (
               <button
-                onClick={handleSkip}
-                disabled={loading}
-                style={{
-                  fontFamily: 'Space Mono, monospace', fontSize: '10px',
-                  color: '#f0b429', background: 'rgba(240,180,41,0.08)',
-                  border: '1px solid rgba(240,180,41,0.3)',
-                  borderRadius: '4px', padding: '4px 12px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
-              >
+  onMouseDown={(e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    handleSkip(e as any)
+  }}
+  disabled={loading}
+  style={{
+    fontFamily: 'Space Mono, monospace', fontSize: '10px',
+    color: '#f0b429', background: 'rgba(240,180,41,0.08)',
+    border: '1px solid rgba(240,180,41,0.3)',
+    borderRadius: '4px', padding: '4px 12px',
+    cursor: loading ? 'not-allowed' : 'pointer',
+  }}
+>
                 {loading ? '...' : '⊘ No Entré'}
               </button>
             )}
@@ -162,17 +166,21 @@ export default function AlertRow({ alert }: { alert: any }) {
               </div>
             ) : (
               <button
-                onClick={handleSkip}
-                disabled={loading}
-                style={{
-                  fontFamily: 'Space Mono, monospace', fontSize: '9px',
-                  color: '#f0b429', background: 'transparent',
-                  border: '1px solid rgba(240,180,41,0.3)',
-                  borderRadius: '4px', padding: '2px 8px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  marginBottom: '4px', display: 'block', marginLeft: 'auto',
-                }}
-              >
+  onMouseDown={(e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    handleSkip(e as any)
+  }}
+  disabled={loading}
+  style={{
+    fontFamily: 'Space Mono, monospace', fontSize: '9px',
+    color: '#f0b429', background: 'transparent',
+    border: '1px solid rgba(240,180,41,0.3)',
+    borderRadius: '4px', padding: '2px 8px',
+    cursor: loading ? 'not-allowed' : 'pointer',
+    marginBottom: '4px', display: 'block', marginLeft: 'auto',
+  }}
+>
                 {loading ? '...' : '⊘ No Entré'}
               </button>
             )}
