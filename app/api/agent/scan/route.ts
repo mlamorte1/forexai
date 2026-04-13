@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const nyMinute = now.getMinutes()
     const nyDay = now.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
     const isOvernightWindow = nyHour >= 19
-    const isMarketHours = nyHour >= 8 && nyHour < 17
+    const isMarketHours = nyHour >= 8 && nyHour < 19
 
     const isFridayAfterClose = nyDay === 'Friday' && nyHour >= 17
     const isSaturdayAllDay = nyDay === 'Saturday'
