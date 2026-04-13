@@ -212,6 +212,7 @@ export async function GET(req: Request) {
                 matchTactics(supabase, cfg.user_id, tacticsQuery),
               ])
               candles = { H3, M30, M5 }
+              console.log('[CANDLES OK]', pair, 'H3=' + H3.length, 'M30=' + M30.length, 'M5=' + M5.length)
 
               const [base_currency, quote_currency] = pair.split('_')
               const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
@@ -227,6 +228,7 @@ export async function GET(req: Request) {
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: false
               })
+              console.log('[AGENT OK]', pair, 'signal=' + analysis.signal)
 
               await logScan(pair, analysis)
 
