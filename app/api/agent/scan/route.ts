@@ -173,7 +173,7 @@ export async function GET(req: Request) {
                 strategy: 'overnight_trade',
                 skip_reason: analysis.skip_reason || null,
                 reasoning: analysis.reasoning || null,
-              }).then(() => {}).catch(() => {})
+              }).catch(() => {})
 
               // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
