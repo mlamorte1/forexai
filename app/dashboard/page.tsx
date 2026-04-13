@@ -30,11 +30,12 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .single()
 
-  // Get recent alerts
+  // Get recent alerts — solo BUY/SELL, no WAIT
   const { data: alerts } = await supabase
     .from('alerts')
     .select('*')
     .eq('user_id', user.id)
+    .in('signal', ['BUY', 'SELL'])
     .order('created_at', { ascending: false })
     .limit(5)
 
