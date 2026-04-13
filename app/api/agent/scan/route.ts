@@ -165,15 +165,18 @@ export async function GET(req: Request) {
               })
 
               // ✅ Log ALL results including WAIT for diagnostics
-              await supabase.from('scan_logs').insert({
-                user_id: cfg.user_id, pair,
-                signal: analysis.signal,
-                confidence: analysis.confidence || 0,
-                htf_state: analysis.market_state || null,
-                strategy: 'overnight_trade',
-                skip_reason: analysis.skip_reason || null,
-                reasoning: analysis.reasoning || null,
-              }).catch(() => {})
+              // DESPUÉS:
+              try {
+                await supabase.from('scan_logs').insert({
+                  user_id: cfg.user_id, pair,
+                  signal: analysis.signal,
+                  confidence: analysis.confidence || 0,
+                  htf_state: analysis.market_state || null,
+                  strategy: 'overnight_trade',
+                  skip_reason: analysis.skip_reason || null,
+                  reasoning: analysis.reasoning || null,
+                })
+              } catch {}
 
               // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
