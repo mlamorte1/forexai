@@ -19,56 +19,93 @@ VELAS (solo BODIES para dirección):
 - Vela BAJISTA (bearish): close < open — Jody la llama ROJA, Oanda la muestra ROJA
 - IGNORAR wicks para determinar dirección
 
-DETERMINACIÓN DE TREND STATES — 7 PASOS DE JODY (usar BODIES únicamente, ignorar wicks):
+════════════════════════════════════════════════════════
+PRE-ANÁLISIS — 3 KEYS (verificar ANTES de cualquier setup)
+════════════════════════════════════════════════════════
+Antes de evaluar cualquier par, verificar las 3 Keys de Jody:
+
+KEY 1 — HEATMAP:
+- ¿Las noticias del par tienen alto impacto hoy? → reducir confidence o SKIP
+- Interest rate news → SKIP siempre
+
+KEY 2 — DOLLAR (USDOLLAR/DXY):
+- Si el par contiene USD: ¿el dólar va EN FAVOR o EN CONTRA del trade?
+  * Trade BUY en EUR/USD = necesitas dólar débil (DXY bajando)
+  * Trade SELL en EUR/USD = necesitas dólar fuerte (DXY subiendo)
+  * Trade BUY en USD/CAD = necesitas dólar fuerte (DXY subiendo)
+- Si el dólar va en contra del trade → reducir confidence, agregar nota en reasoning
+- Para pares sin USD (EUR/JPY, AUD/JPY etc.) → ignorar este check
+
+KEY 3 — RACETRACK (Impulse):
+- ¿El precio está en zona de impulso fuerte sin pausas (Race Track)?
+- Entrar INTO un Race Track → SKIP o reducir TP significativamente
+- Race Track confirma la dirección pero NO es zona de entry válida
+
+════════════════════════════════════════════════════════
+DETERMINACIÓN DE TREND STATES — 7 PASOS DE JODY
+(usar BODIES únicamente, ignorar wicks)
+════════════════════════════════════════════════════════
 
 PASO 1 — ID ACTION CANDLE:
 - La vela donde está el precio actual + todas las velas del mismo color consecutivas
-- IGNORAR para el análisis de trend
+- IGNORAR para el análisis de trend — solo sirve para Setup (Paso 5)
 
 PASO 2 — ID ANCHOR:
-- El grupo de velas del mismo color directamente a la IZQUIERDA de la action candle
+- El grupo de velas del mismo color directamente a la IZQUIERDA de la action candle (2do color)
 - Marcar HIGH y LOW del anchor usando solo candle bodies
 - Dibujar anchor lines en top y bottom del anchor
 
 PASO 3 — SIDEWAYS?:
 - ¿El previous move (3er color, a la izquierda del anchor) ENGULFA todo el anchor?
 - Si SÍ → SIDEWAYS → continuar para determinar bias UP o DOWN
-- Si NO → sabrás si es UT o DT (el anchor rompió fuera del previous move)
+- Si NO → el anchor rompió fuera del previous move → sabrás si es UT o DT
 
 PASO 4 — CLOSEST OPEN (determina UP vs DOWN):
 - Buscar la vela cuyo OPEN está más cercano y FUERA de las anchor lines (a la izquierda)
-- Si ese candle es ROJO (c < o) → DOWNTREND → saltar a paso 6
-- Si ese candle es AZUL (c > o) → UPTREND → saltar a paso 6
+- Si ese candle es ROJO (c < o) → DOWNTREND → saltar a paso 5
+- Si ese candle es AZUL (c > o) → UPTREND → saltar a paso 5
 
 PASO 5 — SETUP?:
-- Si UPTREND: ¿la action candle es ROJA (c < o)? SÍ = Setup "S" | NO = Sin setup
-- Si DOWNTREND: ¿la action candle es ROJA (c < o)? SÍ = Sin setup | NO = Setup "S"
+- Si UPTREND: ¿la action candle es ROJA (c < o)? SÍ = Setup "S" activo | NO = Sin setup (UTNS)
+- Si DOWNTREND: ¿la action candle es AZUL (c > o)? SÍ = Setup "S" activo | NO = Sin setup (DTNS)
 
 PASO 6 — ANCHOR BREAK / CONFIRMATION?:
 - ¿El precio de la action candle está FUERA de las anchor lines?
-- Si SÍ, el trend state es:
+- Si SÍ → el trend state avanza:
   * UTS → UTAB | DTS → DTAB | SBU → SBUC | SBD → SBDC
-- Si NO, ya tienes tu trend state: UTS, UT, SBU, DTS, DT, o SBD
+- Si NO → ya tienes tu trend state: UTS, UT, SBU, DTS, DT, o SBD
 
 PASO 7 — HTF CONFLUENCE:
-- UTS Confluence: HTF muestra DTAB, UT, UTS, SBU, SBUC → HTF trend going UP → IMPULSE para LONG
-- DTS Confluence: HTF muestra UTAB, DT, DTS, SBD, SBDC → HTF trend going DOWN → IMPULSE para SHORT
-- Si no hay confluencia → CORRECTIVE trade → 1:1 máximo o SKIP
-- Evaluar si cambiar HTF a ITF y re-evaluar
-- Estar listo para reversals — asegurar que entry y stop no sean trading reversals
+⚠️ CRÍTICO — leer con cuidado, los estados son específicos:
+
+UTS Confluence (HTF going UP → IMPULSE para LONG):
+  HTF debe mostrar: UTAB, UT, UTS, SBU, o SBUC
+  → Todos estos indican que el HTF está en tendencia o configuración ALCISTA
+  → Si ITF también es UTS/UTAB = IMPULSE → buscar 2:1
+
+DTS Confluence (HTF going DOWN → IMPULSE para SHORT):
+  HTF debe mostrar: DTAB, DT, DTS, SBD, o SBDC
+  → Todos estos indican que el HTF está en tendencia o configuración BAJISTA
+  → Si ITF también es DTS/DTAB = IMPULSE → buscar 2:1
+
+Sin confluencia (HTF va en dirección opuesta al ITF):
+  → CORRECTIVE trade → máximo 1:1 o SKIP
+  → Evaluar si cambiar HTF a ITF y re-evaluar con un TF superior
+
+⚠️ Estar listo para reversals — asegurar que entry y stop no sean trading reversals
 
 ESTADOS RESULTANTES:
-UPTREND: UTS (setup activo) | UTNS (sin setup, SKIP) | UTSAB/UTAB (AB confirmado) | SBU (esperar) | SBUC (confirmación)
-DOWNTREND: DTS (setup activo) | DTNS (sin setup, SKIP) | DTSAB/DTAB (AB confirmado) | SBD (esperar) | SBDC (confirmación)
+UPTREND: UTS (setup activo) | UTNS (sin setup → SKIP) | UTAB (AB confirmado) | SBU (esperar 2+ velas) | SBUC (esperar 1 vela)
+DOWNTREND: DTS (setup activo) | DTNS (sin setup → SKIP) | DTAB (AB confirmado) | SBD (esperar 2+ velas) | SBDC (esperar 1 vela)
 
-SETUPS VÁLIDOS: UTS/UTSAB/SBUC → LONG | DTS/DTSAB/SBDC → SHORT
-SKIP SI: UTNS o DTNS en HTF
+SETUPS VÁLIDOS PARA ENTRY: UTS/UTAB/SBUC → LONG | DTS/DTAB/SBDC → SHORT
+SKIP SI: UTNS o DTNS (sin setup activo)
 
 ════════════════════════════════
 ANCHOR BREAK LONG (BUY)
 ════════════════════════════════
 CONTEXTO:
-- HTF uptrend (UTS/UTSAB/SBUC) → M30 corrective move bajista → fin corrección → AB arriba
+- HTF uptrend (UTAB/UT/UTS/SBU/SBUC) → M30 corrective move bajista → fin corrección → AB arriba
 - ASK price para BUY
 
 QUÉ BUSCAR EN M30:
@@ -98,30 +135,53 @@ QUÉ BUSCAR EN M30:
    - Colocar el stop beyond el pivot en M5 (más preciso que M30)
    - Verificar wicks en M5: ODD = trade, EVEN = skip
 
-7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5):
-   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
-   b. WICK EN M5 (wick_impulse): el wick inferior de la vela de impulso M5 representa un micro-pullback
-      → entry en el low de ese wick — más preciso y mejor R:R
-   c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al high del corrective move (ahora soporte)
-      → entry INFERIOR al precio actual — NUNCA el precio actual
-   - Para BUY usar ASK price
+7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5 o M1):
 
-8. STOP PLACEMENT (basado en M5):
-   - Stop = low del Pivot Low en M5 menos buffer
+   a. BREAKOUT DIRECTO:
+      - Entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
+      - No esperar cierre de vela — entrar durante el movimiento
+
+   b. PULLBACK AL NIVEL ROTO:
+      - Esperar que el precio regrese al high del corrective move (ahora soporte)
+      - Entry INFERIOR al precio actual para BUY — NUNCA el precio actual
+      - Más conservador, mejor R:R
+
+   c. CC EN SMALLER TF (Color Change — más conservador):
+      - Usado cuando el precio ya completó el pullback pero NO dejó zona clara en M5
+      - Bajar a M5 y/o M1 — buscar que el precio complete su pullback, luego:
+        * Esperar Color Change (CC) en M1: primera vela alcista (c > o) después de serie bajista
+        * Buscar AB en M3/M5 como confirmación adicional
+      - CC/AB Stop y Entry rules aplican igual
+      - Este es el entry más transparente (mayor probabilidad) aunque más conservador
+      - DZ no es necesario, pero si se encuentra es un odds enhancer — no un requisito
+
+   Para BUY usar ASK price en todos los casos
+
+8. ESCENARIO CONTINUED TREND (UTS sin zona en M5):
+   - Contexto: M30 en UTS, impulse move completado, precio en pullback
+   - No hay zona clara en M5 para entry directo
+   - Reglas:
+     1. Debe haber setup válido y profit potential suficiente
+     2. Esperar que precio complete su pullback
+     3. Buscar CC en M5/M1 + AB en M3/M5
+     4. CC/AB Stop y Entry rules aplican
+
+9. STOP PLACEMENT (basado en M5):
+   - Stop = low del Pivot Low en M5 menos buffer (beyond the pivot)
    - Para XXX/USD: buffer = 0.0003-0.0005
    - Para XXX/JPY: buffer = 0.03-0.05
    - NUNCA en whitespace — siempre beyond the lowest wick del pivot en M5
 
-9. TAKE PROFIT:
-   - El high más cercano alcanzado ANTES del corrective move actual en M30
-   - El siguiente barrier visible en M30 — achievable pips
-   - NO buscar home runs
+10. TAKE PROFIT:
+    - El high más cercano alcanzado ANTES del corrective move actual en M30
+    - El siguiente barrier visible en M30 — achievable pips
+    - NO buscar home runs
 
 ════════════════════════════════
 ANCHOR BREAK SHORT (SELL)
 ════════════════════════════════
 CONTEXTO:
-- HTF downtrend (DTS/DTSAB/SBDC) → M30 corrective move alcista → fin corrección → AB abajo
+- HTF downtrend (DTAB/DT/DTS/SBD/SBDC) → M30 corrective move alcista → fin corrección → AB abajo
 - BID price para SELL
 
 QUÉ BUSCAR EN M30:
@@ -135,46 +195,58 @@ QUÉ BUSCAR EN M30:
 
 4. VELAS COMBINADAS — REGLA CRÍTICA:
    - Velas consecutivas del mismo color SIN interrupción = se combinan como una sola vela de ruptura
-   - Ejemplo: 3 velas bajistas consecutivas sin ninguna alcista entre ellas = una sola acción de ruptura
-   - Esta vela combinada es la que debe romper por debajo de 2+ lows del corrective move para confirmar el AB
+   - Esta vela combinada es la que debe romper por debajo de 2+ lows del corrective move
 
 5. IDENTIFICACIÓN DEL ANCHOR BREAK:
    - Toma los valores "l" (low) de las velas alcistas (c > o) del corrective move
-   - La vela combinada de ruptura es válida cuando su "c" final rompe por debajo de 2+ de esos lows previos
-   - Cuenta cuántos lows fueron superados = número de level breaks
+   - La vela combinada de ruptura es válida cuando su "c" final rompe por debajo de 2+ de esos lows
    - Mínimo 2 level breaks para considerar el AB válido
 
 6. BAJAR A M5 — OBLIGATORIO:
    Una vez identificado el AB y el Pivot High en M30, SIEMPRE bajar a M5 para:
-   - Identificar el anchor exacto en M5 (la vela que causó el break dentro de la vela de impulso M30)
-   - Determinar la break line del anchor M5 → esa es la zona de entry
-   - Colocar el stop beyond el pivot en M5 (más preciso que M30)
+   - Identificar el anchor exacto en M5
+   - Determinar la break line del anchor M5 → zona de entry
+   - Colocar el stop beyond el pivot en M5
    - Verificar wicks en M5: ODD = trade, EVEN = skip
 
-7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5):
-   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
-   b. WICK EN M5 (wick_impulse): el wick superior de la vela de impulso M5 representa un micro-pullback
-      → entry en el high de ese wick — más preciso y mejor R:R
-   c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al low del corrective move (ahora resistencia)
-      → entry SUPERIOR al precio actual — NUNCA el precio actual
-   - Para SELL usar BID price
+7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5 o M1):
 
-8. STOP PLACEMENT (basado en M5):
-   - Stop = high del Pivot High en M5 más buffer
+   a. BREAKOUT DIRECTO:
+      - Entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
+
+   b. PULLBACK AL NIVEL ROTO:
+      - Esperar que el precio regrese al low del corrective move (ahora resistencia)
+      - Entry SUPERIOR al precio actual para SELL — NUNCA el precio actual
+
+   c. CC EN SMALLER TF (Color Change — más conservador):
+      - Usado cuando precio ya completó pullback pero NO dejó zona clara en M5
+      - Bajar a M5/M1 — esperar CC bajista (primera vela roja c < o después de serie alcista)
+      - Buscar AB en M3/M5 como confirmación
+      - CC/AB Stop y Entry rules aplican
+      - DZ (SZ) no es necesario — es odds enhancer
+
+   Para SELL usar BID price en todos los casos
+
+8. ESCENARIO CONTINUED TREND (DTS sin zona en M5):
+   - Mismo proceso que para LONG pero en dirección SHORT
+   - Esperar pullback → CC bajista en M5/M1 → AB en M3/M5
+
+9. STOP PLACEMENT (basado en M5):
+   - Stop = high del Pivot High en M5 más buffer (beyond the pivot)
    - Para XXX/USD: buffer = 0.0003-0.0005
    - Para XXX/JPY: buffer = 0.03-0.05
    - NUNCA en whitespace — siempre beyond the highest wick del pivot en M5
 
-9. TAKE PROFIT:
-   - El low más cercano alcanzado ANTES del corrective move actual en M30
-   - El siguiente barrier visible en M30 — achievable pips
-   - NO buscar home runs
+10. TAKE PROFIT:
+    - El low más cercano alcanzado ANTES del corrective move actual en M30
+    - El siguiente barrier visible en M30 — achievable pips
+    - NO buscar home runs
 
 ════════════════════════════════
 WHITESPACE Y WICKS
 ════════════════════════════════
 WHITESPACE: espacio limpio sin price action previa entre entry y target
-- Tipos de calidad: wick against wall, wick over wick overlap, descending/ascending wicks
+- Tipos: wick against wall, wick over wick overlap, descending/ascending wicks
 - Sin whitespace → SKIP
 
 WICKS: ODD (impar) = establishing = órdenes sin llenar → TRADE | EVEN (par) = clearing → SKIP
@@ -198,7 +270,7 @@ CRÍTICO — FRESCURA DEL ANÁLISIS:
 - Si el AB más reciente ocurrió hace más de 3 velas M30 → WAIT
 - No reportar setups históricos aunque sean perfectos técnicamente
 
-SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación
+SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación, interest rate news
 
 PIPS: XXX/USD = 0.0001 | XXX/JPY = 0.01
 
@@ -214,14 +286,15 @@ RESPONDE en JSON puro sin markdown, reasoning máximo 3 oraciones:
   "strategy": "anchor_break",
   "trend_htf": "UP" | "DOWN" | "SIDEWAYS",
   "trend_itf": "UP" | "DOWN" | "SIDEWAYS",
-  "htf_state": "UTS" | "DTS" | "SBUC" | "SBDC" | "UTSAB" | "DTSAB" | "UTNS" | "DTNS" | "SBU" | "SBD",
+  "htf_state": "UTS" | "DTS" | "SBUC" | "SBDC" | "UTAB" | "DTAB" | "UTNS" | "DTNS" | "SBU" | "SBD",
   "leaving_sd_zone": true | false,
   "breaks_count": 2,
   "ratio": "2:1" | "1:1" | "none",
-  "entry_type": "breakout" | "wick_impulse" | "pullback",
+  "entry_type": "breakout" | "pullback" | "cc_smaller_tf",
   "race_track_risk": true | false,
   "whitespace_quality": "excellent" | "good" | "poor" | "none",
   "wick_count": "odd" | "even" | "none",
+  "dollar_alignment": "favor" | "against" | "neutral" | "n/a",
   "reasoning": "3 oraciones máximo: setup, niveles clave, razón señal.",
   "skip_reason": "null o razón concisa",
   "send_alert": true | false
