@@ -144,6 +144,7 @@ export async function GET(req: Request) {
         }
 
         const pairResults = await Promise.all(activePairs.map(async (pair: string) => {
+          console.log(`[SCAN START] pair=${pair} strategy=${strategy}`)
           try {
             const tacticsQuery = isOvernightWindow
               ? `Overnight trade setup ${pair} - Daily trend anchor whitespace H4 level`
