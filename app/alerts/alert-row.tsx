@@ -13,7 +13,7 @@ const outcomeConfig: Record<string, { color: string; label: string }> = {
 
 export default function AlertRow({ alert }: { alert: any }) {
   const [expanded, setExpanded] = useState(false)
-  const [outcome, setOutcome] = useState<string | null>(alert.outcome || null)
+  const [outcome, setOutcome] = useState<string | null>(alert.outcome ?? null)
   const [loading, setLoading] = useState(false)
 
   const handleSkip = async (e: React.MouseEvent) => {
