@@ -212,18 +212,18 @@ export async function GET(req: Request) {
                 matchTactics(supabase, cfg.user_id, tacticsQuery),
               ])
               candles = { H3, M30, M5 }
-              console.log('[CANDLES OK]', pair, 'H3=' + H3.length, 'M30=' + M30.length, 'M5=' + M5.length)
-
-              const [base_currency, quote_currency] = pair.split('_')
-              const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
-
-              const lastM5 = M5[M5.length - 1]
-              if (lastM5) {
-                const minutesAgo = (now.getTime() - new Date(lastM5.t).getTime()) / 60000
-                if (minutesAgo > 15) {
-                  return { pair, signal: 'SKIP', reason: 'Stale data: ' + Math.round(minutesAgo) + 'min ago' }
-                }
-              }
+console.log('[CANDLES OK]', pair, 'H3=' + H3.length, 'M30=' + M30.length, 'M5=' + M5.length)
+const [base_currency, quote_currency] = pair.split('_')
+const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
+const lastM5 = M5[M5.length - 1]
+console.log('[M5 FRESHNESS]', pair, 'lastCandle=', lastM5?.t, 'minutesAgo=', lastM5 ? Math.round((now.getTime() - new Date(lastM5.t).getTime()) / 60000) : 'null')
+if (lastM5) {
+  const minutesAgo = (now.getTime() - new Date(lastM5.t).getTime()) / 60000
+  if (minutesAgo > 15) {
+    console.log('[M5 BLOCKED]', pair, 'stale=' + Math.round(minutesAgo) + 'min')
+    return { pair, signal: 'SKIP', reason: 'Stale data: ' + Math.round(minutesAgo) + 'min ago' }
+  }
+}
 
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: false
