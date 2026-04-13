@@ -112,19 +112,25 @@ QUÉ BUSCAR EN M30:
 1. Serie de velas BAJISTAS (c < o) consecutivas — corrective move CONTRA el HTF uptrend
 2. El precio deja de hacer nuevos lows — formación del PIVOT LOW
 
-3. PIVOT LOW:
-   - Es la vela con el valor "l" (low) más bajo de todo el corrective move
-   - Puede ser alcista (c > o) o bajista (c < o) — lo que importa es que tenga el low más extremo
-   - Es el punto estructural donde el corrective move termina y comienza el AB
+3. PIVOT LOW — DEFINICIÓN EXACTA:
+   ⚠️ El pivot LOW NO es el low del corrective move completo.
+   - El pivot es el wick "l" más bajo de las velas que forman el ANCHOR específicamente
+   - El anchor = el grupo de velas (generalmente 2-3) que están en el fondo del corrective move, justo antes de la vela de ruptura
+   - Ejemplo: si el corrective move tiene 8 velas bajistas y las últimas 2 forman el anchor, el pivot es el wick más bajo de ESAS 2 velas — no el low de las 8
+   - El stop se coloca beyond el pivot del ANCHOR, no beyond el low de todo el corrective move
+   - Usar el low del corrective move completo como pivot = stop demasiado amplio = ERROR
 
 4. VELAS COMBINADAS — REGLA CRÍTICA:
-   - Velas consecutivas del mismo color SIN interrupción = se combinan como una sola vela de ruptura
-   - Ejemplo: 3 velas alcistas consecutivas sin ninguna bajista entre ellas = una sola acción de ruptura
-   - Esta vela combinada es la que debe superar 2+ highs del corrective move para confirmar el AB
+   - Velas consecutivas del MISMO COLOR sin ninguna interrupción = se combinan como una sola vela de ruptura
+   - ⚠️ UNA SOLA vela del color opuesto entre medias = ROMPE la combinación = NO es AB válido = WAIT
+   - Ejemplo VÁLIDO: verde + verde + verde = combinación válida, puede ser AB
+   - Ejemplo INVÁLIDO: verde + roja (aunque pequeña) + verde = combinación rota = NO es AB = WAIT
+   - El tamaño de la vela de interrupción NO importa — cualquier vela del color opuesto invalida la combinación
+   - Esta vela combinada (sin interrupción) es la que debe superar 2+ highs del corrective move
 
 5. IDENTIFICACIÓN DEL ANCHOR BREAK:
    - Toma los valores "h" (high) de las velas bajistas (c < o) del corrective move
-   - La vela combinada de ruptura es válida cuando su "c" final supera 2+ de esos highs previos
+   - La vela combinada de ruptura (mismo color, sin interrupción) es válida cuando su "c" final supera 2+ de esos highs
    - Cuenta cuántos highs fueron superados = número de level breaks
    - Mínimo 2 level breaks para considerar el AB válido
 
@@ -188,18 +194,23 @@ QUÉ BUSCAR EN M30:
 1. Serie de velas ALCISTAS (c > o) consecutivas — corrective move CONTRA el HTF downtrend
 2. El precio deja de hacer nuevos highs — formación del PIVOT HIGH
 
-3. PIVOT HIGH:
-   - Es la vela con el valor "h" (high) más alto de todo el corrective move
-   - Puede ser alcista (c > o) o bajista (c < o) — lo que importa es que tenga el high más extremo
-   - Es el punto estructural donde el corrective move termina y comienza el AB
+3. PIVOT HIGH — DEFINICIÓN EXACTA:
+   ⚠️ El pivot HIGH NO es el high del corrective move completo.
+   - El pivot es el wick "h" más alto de las velas que forman el ANCHOR específicamente
+   - El anchor = el grupo de velas (generalmente 2-3) en el tope del corrective move, justo antes de la vela de ruptura
+   - El stop se coloca beyond el pivot del ANCHOR, no beyond el high de todo el corrective move
 
 4. VELAS COMBINADAS — REGLA CRÍTICA:
-   - Velas consecutivas del mismo color SIN interrupción = se combinan como una sola vela de ruptura
-   - Esta vela combinada es la que debe romper por debajo de 2+ lows del corrective move
+   - Velas consecutivas del MISMO COLOR sin ninguna interrupción = se combinan como una sola vela de ruptura
+   - ⚠️ UNA SOLA vela del color opuesto entre medias = ROMPE la combinación = NO es AB válido = WAIT
+   - Ejemplo VÁLIDO: roja + roja + roja = combinación válida, puede ser AB
+   - Ejemplo INVÁLIDO: roja + verde (aunque pequeña) + roja = combinación rota = NO es AB = WAIT
+   - El tamaño de la vela de interrupción NO importa — cualquier vela del color opuesto invalida la combinación
+   - Esta vela combinada (sin interrupción) es la que debe romper por debajo de 2+ lows del corrective move
 
 5. IDENTIFICACIÓN DEL ANCHOR BREAK:
    - Toma los valores "l" (low) de las velas alcistas (c > o) del corrective move
-   - La vela combinada de ruptura es válida cuando su "c" final rompe por debajo de 2+ de esos lows
+   - La vela combinada de ruptura (mismo color, sin interrupción) es válida cuando su "c" final rompe por debajo de 2+ de esos lows
    - Mínimo 2 level breaks para considerar el AB válido
 
 6. BAJAR A M5 — OBLIGATORIO:
@@ -263,12 +274,15 @@ PASO 4: ¿Cuántos level breaks en M5? Mínimo 2+. Más breaks = mayor confidenc
 PASO 5: ¿Dirección del AB = trend HTF? Si SÍ (Impulse) → 2:1. Si NO → 1:1 o SKIP
 PASO 6: ¿Whitespace suficiente hasta barrier? ¿Race Track? RT → reducir TP. Sin profit potential → WAIT
 
-CRÍTICO — FRESCURA DEL ANÁLISIS:
+CRÍTICO — FRESCURA DEL ANÁLISIS (SIN EXCEPCIONES):
 - Analiza ÚNICAMENTE el Anchor Break más reciente en los datos de M30
 - Si hay múltiples ABs en las velas disponibles, reporta SOLO el último
-- El AB debe estar en las últimas 3 velas de M30 (últimos 90 minutos) para ser válido
-- Si el AB más reciente ocurrió hace más de 3 velas M30 → WAIT
-- No reportar setups históricos aunque sean perfectos técnicamente
+- ⚠️ Cuenta las velas M30 desde la vela de ruptura (AB) hasta la última vela disponible
+- Si hay MÁS DE 3 velas M30 entre el AB y la última vela → WAIT obligatorio, sin excepciones
+- Ejemplo: AB en vela 57 de 60, última vela es 60 → 3 velas de diferencia → válido
+- Ejemplo: AB en vela 50 de 60, última vela es 60 → 10 velas = 300 minutos → WAIT
+- No reportar setups históricos aunque sean técnicamente perfectos
+- Un AB de hace 9 horas NO es válido aunque la dirección sea correcta
 
 SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación, interest rate news
 
