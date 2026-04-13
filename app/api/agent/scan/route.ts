@@ -268,7 +268,7 @@ export async function GET(req: Request) {
             }
 
           } catch (pairErr: any) {
-            console.error(`[SCAN ERROR] pair=${pair}`, pairErr)
+            console.error(`[SCAN ERROR] pair=${pair} message=${pairErr.message}`, pairErr)
             try {
               await supabase.from('scan_logs').insert({
                 user_id: cfg.user_id,
