@@ -28,7 +28,9 @@ export async function GET(req: Request) {
     }
 
     // Agrupar por user para obtener sus configs de Oanda
-    const userIds = [...new Set(pendingAlerts.map(a => a.user_id))]
+    const userIdSet = new Set<string>()
+pendingAlerts.forEach(a => userIdSet.add(a.user_id))
+const userIds = Array.from(userIdSet)
     const { data: configs } = await supabase
       .from('oanda_configs')
       .select('user_id, api_key, account_id, environment')
