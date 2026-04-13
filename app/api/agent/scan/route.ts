@@ -12,7 +12,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ✅ Determinar hora EST y estrategia
     const now = new Date()
     const nyHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }))
     const nyMinute = now.getMinutes()
@@ -20,7 +19,7 @@ export async function GET(req: Request) {
     const isOvernightWindow = nyHour >= 19
     const isMarketHours = nyHour >= 8 && nyHour < 17
 
-    // ✅ Mercado cerrado: viernes después de 5PM hasta domingo 5PM EST
+    // ✅ Mercado cerrado
     const isFridayAfterClose = nyDay === 'Friday' && nyHour >= 17
     const isSaturdayAllDay = nyDay === 'Saturday'
     const isSundayBeforeOpen = nyDay === 'Sunday' && nyHour < 17
@@ -28,7 +27,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, message: 'Market closed — weekend skip' })
     }
 
-    // ✅ Cron inteligente: fuera de horario solo correr en :00 y :30
+    // ✅ Cron inteligente
     if (!isMarketHours && !isOvernightWindow && nyMinute !== 0 && nyMinute !== 30) {
       return NextResponse.json({ ok: true, message: 'Off-hours skip' })
     }
@@ -67,16 +66,15 @@ export async function GET(req: Request) {
         const userEmail = user.email
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
+        const strategy = isOvernightWindow ? 'overnight_trade' : 'anchor_break'
 
-        // ✅ Duplicate check: skip si hay alerta en últimos 30 min (mismo setup en progreso)
-        // Si pasaron más de 30 min → correr agente (puede haber setup nuevo)
+        // ✅ Duplicate check: skip si hay alerta en últimos 30 min
         const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
         const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString()
         const recentEntries: Record<string, number | null> = {}
         const activePairs: string[] = []
 
         await Promise.all(pairs.map(async ({ pair }: { pair: string }) => {
-          // Check 1: alerta en últimos 30 min → skip (mismo setup en progreso)
           const { data: veryRecentAlert } = await supabase
             .from('alerts')
             .select('id')
@@ -87,9 +85,8 @@ export async function GET(req: Request) {
             .limit(1)
             .maybeSingle()
 
-          if (veryRecentAlert) return // skip — mismo setup en progreso
+          if (veryRecentAlert) return
 
-          // Check 2: guardar último entry (últimas 4h) para comparar después
           const { data: lastAlert } = await supabase
             .from('alerts')
             .select('entry')
@@ -109,7 +106,7 @@ export async function GET(req: Request) {
           return pairs.map(({ pair }: { pair: string }) => ({ pair, signal: 'SKIP', reason: 'Setup reciente en progreso' }))
         }
 
-        // ✅ News cache solo para pares activos — fetch ForexFactory JSON (sin web_search)
+        // ✅ News cache
         const activeCurrencySet = new Set<string>()
         activePairs.forEach((pair: string) => pair.split('_').forEach((c: string) => activeCurrencySet.add(c)))
         const activeCurrencies = Array.from(activeCurrencySet)
@@ -118,15 +115,32 @@ export async function GET(req: Request) {
           newsCache[currency] = await fetchNews(currency)
         }))
 
-
-        // ✅ Helper: verificar si entry es similar al último (mismo setup)
+        // ✅ Helper: mismo setup
         const isSameSetup = (pair: string, newEntry: number | null): boolean => {
           if (!newEntry) return false
           const lastEntry = recentEntries[pair]
           if (!lastEntry) return false
           const pipSize = pair.includes('JPY') ? 0.01 : 0.0001
           const diffPips = Math.abs(newEntry - lastEntry) / pipSize
-          return diffPips <= 10 // mismo setup si entry difiere menos de 10 pips
+          return diffPips <= 10
+        }
+
+        // ✅ Helper: log to scan_logs
+        const logScan = async (pair: string, analysis: any) => {
+          try {
+            await supabase.from('scan_logs').insert({
+              user_id: cfg.user_id,
+              pair,
+              signal: analysis.signal || 'UNKNOWN',
+              confidence: analysis.confidence || 0,
+              htf_state: analysis.htf_state || analysis.market_state || null,
+              strategy,
+              skip_reason: analysis.skip_reason || null,
+              reasoning: analysis.reasoning || null,
+            })
+          } catch (e: any) {
+            console.error(`[LOG ERROR] ${pair}:`, e.message)
+          }
         }
 
         const pairResults = await Promise.all(activePairs.map(async (pair: string) => {
@@ -135,15 +149,13 @@ export async function GET(req: Request) {
               ? `Overnight trade setup ${pair} - Daily trend anchor whitespace H4 level`
               : `Anchor Break setup ${pair} - HTF trend supply demand M30 M5 entry`
 
-            // ✅ Timeframes dinámicos según estrategia
             let candles: Record<string, any[]>
 
             if (isOvernightWindow) {
-              // Overnight Trade: W → D → H4
               const [W, D, H4, tactics] = await Promise.all([
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'W', 24),   // Weekly curve
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 30),   // Daily trend
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 48),  // H4 entry
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'W', 24),
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 30),
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 48),
                 matchTactics(supabase, cfg.user_id, tacticsQuery),
               ])
               candles = { W, D, H4 }
@@ -151,7 +163,6 @@ export async function GET(req: Request) {
               const [base_currency, quote_currency] = pair.split('_')
               const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
 
-              // ✅ Freshness check — última vela H4 no debe tener más de 15 min
               const lastH4 = H4[H4.length - 1]
               if (lastH4) {
                 const minutesAgo = (now.getTime() - new Date(lastH4.t).getTime()) / 60000
@@ -164,26 +175,12 @@ export async function GET(req: Request) {
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: true
               })
 
-              // ✅ Log ALL results including WAIT for diagnostics
-              // DESPUÉS:
-              try {
-                await supabase.from('scan_logs').insert({
-                  user_id: cfg.user_id, pair,
-                  signal: analysis.signal,
-                  confidence: analysis.confidence || 0,
-                  htf_state: analysis.market_state || null,
-                  strategy: 'overnight_trade',
-                  skip_reason: analysis.skip_reason || null,
-                  reasoning: analysis.reasoning || null,
-                })
-              } catch {}
+              await logScan(pair, analysis)
 
-              // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
                 return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
               }
 
-              // ✅ Solo guardar en DB si hay señal real (no WAIT)
               if (analysis.signal !== 'WAIT') {
                 const { data: insertedAlert } = await supabase
                   .from('alerts')
@@ -212,11 +209,10 @@ export async function GET(req: Request) {
               return { pair, signal: analysis.signal, confidence: analysis.confidence, sent: analysis.send_alert }
 
             } else {
-              // Anchor Break: H3 → M30 → M5
               const [H3, M30, M5, tactics] = await Promise.all([
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 48),  // HTF S/D
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 60), // ITF AB
-                fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 24),  // LTF entry
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 48),
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 60),
+                fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 24),
                 matchTactics(supabase, cfg.user_id, tacticsQuery),
               ])
               candles = { H3, M30, M5 }
@@ -224,7 +220,6 @@ export async function GET(req: Request) {
               const [base_currency, quote_currency] = pair.split('_')
               const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
 
-              // ✅ Freshness check — última vela M5 no debe tener más de 15 min
               const lastM5 = M5[M5.length - 1]
               if (lastM5) {
                 const minutesAgo = (now.getTime() - new Date(lastM5.t).getTime()) / 60000
@@ -237,26 +232,12 @@ export async function GET(req: Request) {
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: false
               })
 
-              // ✅ Log ALL results including WAIT for diagnostics
-              // DESPUÉS:
-              try {
-                await supabase.from('scan_logs').insert({
-                  user_id: cfg.user_id, pair,
-                  signal: analysis.signal,
-                  confidence: analysis.confidence || 0,
-                  htf_state: analysis.market_state || null,
-                  strategy: 'overnight_trade',
-                  skip_reason: analysis.skip_reason || null,
-                  reasoning: analysis.reasoning || null,
-                })
-              } catch {}
+              await logScan(pair, analysis)
 
-              // ✅ Skip si mismo setup (entry similar al último)
               if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
                 return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
               }
 
-              // ✅ Solo guardar en DB si hay señal real (no WAIT)
               if (analysis.signal !== 'WAIT') {
                 const { data: insertedAlert } = await supabase
                   .from('alerts')
@@ -287,6 +268,17 @@ export async function GET(req: Request) {
 
           } catch (pairErr: any) {
             console.error(`[SCAN ERROR] pair=${pair}`, pairErr)
+            try {
+              await supabase.from('scan_logs').insert({
+                user_id: cfg.user_id,
+                pair,
+                signal: 'ERROR',
+                confidence: 0,
+                strategy,
+                skip_reason: pairErr.message,
+                reasoning: null,
+              })
+            } catch {}
             return { pair, error: pairErr.message }
           }
         }))
