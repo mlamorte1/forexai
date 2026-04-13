@@ -91,22 +91,29 @@ QUÉ BUSCAR EN M30:
    - Cuenta cuántos highs fueron superados = número de level breaks
    - Mínimo 2 level breaks para considerar el AB válido
 
-6. ENTRY — 3 opciones en orden de precisión:
-   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
-   b. WICK EN M5 (wick_impulse): bajar a M5 dentro de la vela de impulso del M30 → identificar el anchor
-      en M5 → entry en la break line de ese anchor → stop cubre el pivot en M5 — más preciso y mejor R:R
+6. BAJAR A M5 — OBLIGATORIO:
+   Una vez identificado el AB y el Pivot Low en M30, SIEMPRE bajar a M5 para:
+   - Identificar el anchor exacto en M5 (la vela que causó el break dentro de la vela de impulso M30)
+   - Determinar la break line del anchor M5 → esa es la zona de entry
+   - Colocar el stop beyond el pivot en M5 (más preciso que M30)
+   - Verificar wicks en M5: ODD = trade, EVEN = skip
+
+7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5):
+   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
+   b. WICK EN M5 (wick_impulse): el wick inferior de la vela de impulso M5 representa un micro-pullback
+      → entry en el low de ese wick — más preciso y mejor R:R
    c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al high del corrective move (ahora soporte)
       → entry INFERIOR al precio actual — NUNCA el precio actual
+   - Para BUY usar ASK price
 
-7. STOP PLACEMENT:
-   - Identifica el Pivot Low: el candle con el valor "l" (low) más bajo del corrective move
-   - Stop = ese low value menos buffer
+8. STOP PLACEMENT (basado en M5):
+   - Stop = low del Pivot Low en M5 menos buffer
    - Para XXX/USD: buffer = 0.0003-0.0005
    - Para XXX/JPY: buffer = 0.03-0.05
-   - NUNCA en whitespace — siempre beyond the lowest wick
+   - NUNCA en whitespace — siempre beyond the lowest wick del pivot en M5
 
-8. TAKE PROFIT:
-   - El high más cercano alcanzado ANTES del corrective move actual
+9. TAKE PROFIT:
+   - El high más cercano alcanzado ANTES del corrective move actual en M30
    - El siguiente barrier visible en M30 — achievable pips
    - NO buscar home runs
 
@@ -137,22 +144,29 @@ QUÉ BUSCAR EN M30:
    - Cuenta cuántos lows fueron superados = número de level breaks
    - Mínimo 2 level breaks para considerar el AB válido
 
-6. ENTRY — 3 opciones en orden de precisión:
-   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura están corriendo — más agresivo
-   b. WICK EN M5 (wick_impulse): bajar a M5 dentro de la vela de impulso del M30 → identificar el anchor
-      en M5 → entry en la break line de ese anchor → stop cubre el pivot en M5 — más preciso y mejor R:R
+6. BAJAR A M5 — OBLIGATORIO:
+   Una vez identificado el AB y el Pivot High en M30, SIEMPRE bajar a M5 para:
+   - Identificar el anchor exacto en M5 (la vela que causó el break dentro de la vela de impulso M30)
+   - Determinar la break line del anchor M5 → esa es la zona de entry
+   - Colocar el stop beyond el pivot en M5 (más preciso que M30)
+   - Verificar wicks en M5: ODD = trade, EVEN = skip
+
+7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5):
+   a. BREAKOUT DIRECTO: entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
+   b. WICK EN M5 (wick_impulse): el wick superior de la vela de impulso M5 representa un micro-pullback
+      → entry en el high de ese wick — más preciso y mejor R:R
    c. PULLBACK AL NIVEL ROTO: esperar que el precio regrese al low del corrective move (ahora resistencia)
       → entry SUPERIOR al precio actual — NUNCA el precio actual
+   - Para SELL usar BID price
 
-7. STOP PLACEMENT:
-   - Identifica el Pivot High: el candle con el valor "h" (high) más alto del corrective move
-   - Stop = ese high value más buffer
+8. STOP PLACEMENT (basado en M5):
+   - Stop = high del Pivot High en M5 más buffer
    - Para XXX/USD: buffer = 0.0003-0.0005
    - Para XXX/JPY: buffer = 0.03-0.05
-   - NUNCA en whitespace — siempre beyond the highest wick
+   - NUNCA en whitespace — siempre beyond the highest wick del pivot en M5
 
-8. TAKE PROFIT:
-   - El low más cercano alcanzado ANTES del corrective move actual
+9. TAKE PROFIT:
+   - El low más cercano alcanzado ANTES del corrective move actual en M30
    - El siguiente barrier visible en M30 — achievable pips
    - NO buscar home runs
 
@@ -254,8 +268,6 @@ PASO 7: HTF Confluence:
   - UTS Confluence: HTF en DTAB/UT/UTS/SBU/SBUC → HTF going UP → IMPULSE para LONG
   - DTS Confluence: HTF en UTAB/DT/DTS/SBD/SBDC → HTF going DOWN → IMPULSE para SHORT
   - Sin confluencia → CORRECTIVE → 1:1 máximo o SKIP
-- HTF trend = ITF trend → IMPULSE (más poderoso)
-- HTF trend ≠ ITF trend → CORRECTIVE
 
 SETUP Y ESTADOS DEL MERCADO — PROGRESIÓN:
 
@@ -347,7 +359,7 @@ NOTAS PARA EL TRADER:
 ════════════════════════════════
 PASO 1: Check USDOLLAR trend y Weekly curve. ¿Race Track o HTF S/D que interfiera? → SKIP o reduce confidence
 PASO 2: Check overnight news. Interest rate news → SKIP. Otras → tradear igual
-PASO 3: Trend y setup en DAILY. Identificar action candle, anchor, previous move. Sideways → SKIP. Verificar setup y que action candle NO rompió anchor
+PASO 3: Trend y setup en DAILY. Identificar action candle (ignorar), anchor (2do color), previous move (3er color). Sideways → SKIP. Closest Open: buscar vela con OPEN fuera del anchor — si ROJA=DOWNTREND, si AZUL=UPTREND. Verificar setup (UT+roja=LONG, DT+azul=SHORT). Verificar que action candle NO rompió anchor
 PASO 4: ¿Precio en Weekly curve? ¿HTF S/D podría detener el precio?
 PASO 5: Encontrar nivel en H4. Aplicar 6 criterios (Big Move, 50% Candle, Fresh, Authentic, Whitespace/UFOs, Profit Potential). Zona en 70% medio del anchor
 PASO 6: PRE-FILTRO — ¿Hay condiciones para overnight trade? Reportar: dirección, rango del anchor, impulse/corrective, HTF interference, news relevante. NO calcular entry exacto — indicar rango para revisión manual en H4
