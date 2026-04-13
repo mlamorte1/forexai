@@ -162,7 +162,7 @@ export async function GET(req: Request) {
               const lastH4 = H4[H4.length - 1]
               if (lastH4) {
                 const minutesAgo = (now.getTime() - new Date(lastH4.t).getTime()) / 60000
-                if (minutesAgo > 15) {
+                if (minutesAgo > 240) {
                   return { pair, signal: 'SKIP', reason: 'Stale data: ' + Math.round(minutesAgo) + 'min ago' }
                 }
               }
