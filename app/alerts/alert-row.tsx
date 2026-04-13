@@ -17,20 +17,23 @@ export default function AlertRow({ alert }: { alert: any }) {
   const [loading, setLoading] = useState(false)
 
   const handleSkip = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (outcome) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/alerts/outcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alertId: alert.id, outcome: 'skipped' })
-      })
-      if (res.ok) setOutcome('skipped')
-    } finally {
-      setLoading(false)
+  e.stopPropagation()
+  if (outcome) return
+  setLoading(true)
+  try {
+    const res = await fetch('/api/alerts/outcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alertId: alert.id, outcome: 'skipped' })
+    })
+    if (res.ok) {
+      setOutcome('skipped')
+      window.location.reload()
     }
+  } finally {
+    setLoading(false)
   }
+}
 
   const currentOutcome = outcome ? outcomeConfig[outcome] : null
 
