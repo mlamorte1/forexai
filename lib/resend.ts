@@ -10,13 +10,15 @@ export async function sendAlertEmail({
   analysis: any
 }) {
   const signalColor = analysis.signal === 'BUY' ? '#00d4a0' : '#ff4d6a'
-  const signalBg = analysis.signal === 'BUY' ? 'rgba(0,212,160,0.1)' : 'rgba(255,77,106,0.1)'
   const pairFormatted = analysis.pair?.replace('_', '/') || '—'
   const now = new Date().toLocaleString('es-PA', {
     timeZone: 'America/Panama',
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
+
+  const strategyLabel = analysis.strategy === 'overnight_trade' ? 'OVERNIGHT TRADE' : 'ANCHOR BREAK'
+  const strategyColor = analysis.strategy === 'overnight_trade' ? '#7c6af7' : '#00d4a0'
 
   const html = `
 <!DOCTYPE html>
@@ -29,9 +31,18 @@ export async function sendAlertEmail({
         
         <!-- Header -->
         <tr><td style="padding:28px 32px;border-bottom:1px solid #1e2a40;">
-          <p style="margin:0;font-size:11px;color:#00d4a0;letter-spacing:4px;">▶ FOREXAI</p>
-          <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#e8eaf0;">Alerta de Trading</p>
-          <p style="margin:4px 0 0;font-size:11px;color:#5a6480;">${now}</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <p style="margin:0;font-size:11px;color:#00d4a0;letter-spacing:4px;">▶ FOREXAI</p>
+                <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#e8eaf0;">Alerta de Trading</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#5a6480;">${now}</p>
+              </td>
+              <td align="right" valign="top">
+                <span style="display:inline-block;padding:6px 14px;background:${strategyColor}18;border:1px solid ${strategyColor};border-radius:6px;font-size:10px;font-weight:700;color:${strategyColor};letter-spacing:2px;">${strategyLabel}</span>
+              </td>
+            </tr>
+          </table>
         </td></tr>
 
         <!-- Signal badge -->
@@ -79,7 +90,7 @@ export async function sendAlertEmail({
               </td>
               <td>
                 <p style="margin:0 0 4px;font-size:10px;color:#5a6480;">TENDENCIA</p>
-                <p style="margin:0;font-size:14px;color:#e8eaf0;">${analysis.trend || '—'}</p>
+                <p style="margin:0;font-size:14px;color:#e8eaf0;">${analysis.trend_htf || analysis.trend_daily || '—'}</p>
               </td>
               <td>
                 <p style="margin:0 0 4px;font-size:10px;color:#5a6480;">WHITESPACE</p>
@@ -88,6 +99,28 @@ export async function sendAlertEmail({
             </tr>
           </table>
         </td></tr>
+
+        <!-- ATR Box (solo Overnight Trade) -->
+        ${analysis.strategy === 'overnight_trade' && analysis.box_top ? `
+        <tr><td style="padding:0 32px 28px;border-bottom:1px solid #1e2a40;">
+          <p style="margin:0 0 12px;font-size:10px;color:#7c6af7;letter-spacing:3px;">120% ATR BOX</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="33%">
+                <p style="margin:0 0 4px;font-size:10px;color:#5a6480;">ATR H4</p>
+                <p style="margin:0;font-size:14px;color:#e8eaf0;">${analysis.atr_h4?.toFixed(5) || '—'}</p>
+              </td>
+              <td width="33%">
+                <p style="margin:0 0 4px;font-size:10px;color:#5a6480;">BOX TOP</p>
+                <p style="margin:0;font-size:14px;color:#e8eaf0;">${analysis.box_top?.toFixed(5) || '—'}</p>
+              </td>
+              <td width="33%">
+                <p style="margin:0 0 4px;font-size:10px;color:#5a6480;">BOX BOTTOM</p>
+                <p style="margin:0;font-size:14px;color:#e8eaf0;">${analysis.box_bottom?.toFixed(5) || '—'}</p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>` : ''}
 
         <!-- Reasoning -->
         <tr><td style="padding:28px 32px;border-bottom:1px solid #1e2a40;">
@@ -111,7 +144,7 @@ export async function sendAlertEmail({
   return resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL || 'ForexAI <alerts@forexai.app>',
     to,
-    subject: `🎯 ${analysis.signal} ${pairFormatted} — ${analysis.confidence}% confianza | ForexAI`,
+    subject: `🎯 ${analysis.signal} ${pairFormatted} — ${strategyLabel} — ${analysis.confidence}% | ForexAI`,
     html,
   })
 }
