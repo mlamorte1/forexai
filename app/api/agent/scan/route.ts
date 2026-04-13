@@ -128,7 +128,7 @@ export async function GET(req: Request) {
         // ✅ Helper: log to scan_logs
         const logScan = async (pair: string, analysis: any) => {
           try {
-            await supabase.from('scan_logs').insert({
+            const { error } = await supabase.from('scan_logs').insert({
               user_id: cfg.user_id,
               pair,
               signal: analysis.signal || 'UNKNOWN',
@@ -138,8 +138,10 @@ export async function GET(req: Request) {
               skip_reason: analysis.skip_reason || null,
               reasoning: analysis.reasoning || null,
             })
+            if (error) console.error(\`[LOG INSERT ERROR] \${pair}:\`, error.message)
+            else console.log(\`[LOG SUCCESS] \${pair} signal=\${analysis.signal} confidence=\${analysis.confidence}\`)
           } catch (e: any) {
-            console.error(`[LOG ERROR] ${pair}:`, e.message)
+            console.error(\`[LOG ERROR] \${pair}:\`, e.message)
           }
         }
 
