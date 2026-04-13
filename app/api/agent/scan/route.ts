@@ -19,7 +19,6 @@ export async function GET(req: Request) {
     const isOvernightWindow = nyHour >= 19
     const isMarketHours = nyHour >= 8 && nyHour < 17
 
-    // ✅ Mercado cerrado
     const isFridayAfterClose = nyDay === 'Friday' && nyHour >= 17
     const isSaturdayAllDay = nyDay === 'Saturday'
     const isSundayBeforeOpen = nyDay === 'Sunday' && nyHour < 17
@@ -27,7 +26,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, message: 'Market closed — weekend skip' })
     }
 
-    // ✅ Cron inteligente
     if (!isMarketHours && !isOvernightWindow && nyMinute !== 0 && nyMinute !== 30) {
       return NextResponse.json({ ok: true, message: 'Off-hours skip' })
     }
@@ -68,7 +66,6 @@ export async function GET(req: Request) {
         const positions = positionsRaw.positions || []
         const strategy = isOvernightWindow ? 'overnight_trade' : 'anchor_break'
 
-        // ✅ Duplicate check: skip si hay alerta en últimos 30 min
         const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
         const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString()
         const recentEntries: Record<string, number | null> = {}
@@ -106,7 +103,6 @@ export async function GET(req: Request) {
           return pairs.map(({ pair }: { pair: string }) => ({ pair, signal: 'SKIP', reason: 'Setup reciente en progreso' }))
         }
 
-        // ✅ News cache
         const activeCurrencySet = new Set<string>()
         activePairs.forEach((pair: string) => pair.split('_').forEach((c: string) => activeCurrencySet.add(c)))
         const activeCurrencies = Array.from(activeCurrencySet)
@@ -115,7 +111,6 @@ export async function GET(req: Request) {
           newsCache[currency] = await fetchNews(currency)
         }))
 
-        // ✅ Helper: mismo setup
         const isSameSetup = (pair: string, newEntry: number | null): boolean => {
           if (!newEntry) return false
           const lastEntry = recentEntries[pair]
@@ -125,32 +120,30 @@ export async function GET(req: Request) {
           return diffPips <= 10
         }
 
-        // ✅ Helper: log to scan_logs
         const logScan = async (pair: string, analysis: any) => {
-          try {
-            const { error } = await supabase.from('scan_logs').insert({
-              user_id: cfg.user_id,
-              pair,
-              signal: analysis.signal || 'UNKNOWN',
-              confidence: analysis.confidence || 0,
-              htf_state: analysis.htf_state || analysis.market_state || null,
-              strategy,
-              skip_reason: analysis.skip_reason || null,
-              reasoning: analysis.reasoning || null,
-            })
-            if (error) console.error(\`[LOG INSERT ERROR] \${pair}:\`, error.message)
-            else console.log(\`[LOG SUCCESS] \${pair} signal=\${analysis.signal} confidence=\${analysis.confidence}\`)
-          } catch (e: any) {
-            console.error(\`[LOG ERROR] \${pair}:\`, e.message)
+          const { error } = await supabase.from('scan_logs').insert({
+            user_id: cfg.user_id,
+            pair,
+            signal: analysis.signal || 'UNKNOWN',
+            confidence: analysis.confidence || 0,
+            htf_state: analysis.htf_state || analysis.market_state || null,
+            strategy,
+            skip_reason: analysis.skip_reason || null,
+            reasoning: analysis.reasoning || null,
+          })
+          if (error) {
+            console.error('[LOG INSERT ERROR]', pair, error.message)
+          } else {
+            console.log('[LOG SUCCESS]', pair, 'signal=' + analysis.signal, 'confidence=' + analysis.confidence)
           }
         }
 
         const pairResults = await Promise.all(activePairs.map(async (pair: string) => {
-          console.log(`[SCAN START] pair=${pair} strategy=${strategy}`)
+          console.log('[SCAN START]', pair, 'strategy=' + strategy)
           try {
             const tacticsQuery = isOvernightWindow
-              ? `Overnight trade setup ${pair} - Daily trend anchor whitespace H4 level`
-              : `Anchor Break setup ${pair} - HTF trend supply demand M30 M5 entry`
+              ? 'Overnight trade setup ' + pair + ' - Daily trend anchor whitespace H4 level'
+              : 'Anchor Break setup ' + pair + ' - HTF trend supply demand M30 M5 entry'
 
             let candles: Record<string, any[]>
 
@@ -170,7 +163,7 @@ export async function GET(req: Request) {
               if (lastH4) {
                 const minutesAgo = (now.getTime() - new Date(lastH4.t).getTime()) / 60000
                 if (minutesAgo > 15) {
-                  return { pair, signal: 'SKIP', reason: `Stale data: ${Math.round(minutesAgo)}min ago` }
+                  return { pair, signal: 'SKIP', reason: 'Stale data: ' + Math.round(minutesAgo) + 'min ago' }
                 }
               }
 
@@ -227,7 +220,7 @@ export async function GET(req: Request) {
               if (lastM5) {
                 const minutesAgo = (now.getTime() - new Date(lastM5.t).getTime()) / 60000
                 if (minutesAgo > 15) {
-                  return { pair, signal: 'SKIP', reason: `Stale data: ${Math.round(minutesAgo)}min ago` }
+                  return { pair, signal: 'SKIP', reason: 'Stale data: ' + Math.round(minutesAgo) + 'min ago' }
                 }
               }
 
@@ -270,25 +263,23 @@ export async function GET(req: Request) {
             }
 
           } catch (pairErr: any) {
-            console.error(`[SCAN ERROR] pair=${pair} message=${pairErr.message}`, pairErr)
-            try {
-              await supabase.from('scan_logs').insert({
-                user_id: cfg.user_id,
-                pair,
-                signal: 'ERROR',
-                confidence: 0,
-                strategy,
-                skip_reason: pairErr.message,
-                reasoning: null,
-              })
-            } catch {}
+            console.error('[SCAN ERROR] pair=' + pair, pairErr.message)
+            await supabase.from('scan_logs').insert({
+              user_id: cfg.user_id,
+              pair,
+              signal: 'ERROR',
+              confidence: 0,
+              strategy,
+              skip_reason: pairErr.message,
+              reasoning: null,
+            }).then(() => {}).catch((e: any) => console.error('[LOG CATCH ERROR]', e.message))
             return { pair, error: pairErr.message }
           }
         }))
 
         return pairResults
       } catch (userErr: any) {
-        console.error(`[SCAN ERROR] user=${cfg.user_id}`, userErr)
+        console.error('[SCAN ERROR] user=' + cfg.user_id, userErr.message)
         return [{ user_id: cfg.user_id, error: userErr.message }]
       }
     }))
@@ -299,3 +290,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
