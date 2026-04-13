@@ -219,12 +219,29 @@ TREND:
 - HTF trend = ITF trend → IMPULSE (más poderoso)
 - HTF trend ≠ ITF trend → CORRECTIVE
 
-SETUP:
+SETUP Y ESTADOS DEL MERCADO — PROGRESIÓN:
+
+DOWNTREND PROGRESSION (buscar SHORT):
+- SBD → "Mínimo 2+ candles más hasta DTS. No hay trade todavía."
+- SBDC → "Mínimo 1 candle más hasta DTS. Getting closer."
+- DTS → "ESTE ES EL ESTADO ÓPTIMO. Bajar a H4 y buscar zona dentro del anchor. Si ya estás en SBD/SBDC cuando ves esto = missed trade, buscar pullback."
+- DTAB → precio acelerando downtrend, buscar pullback entry
+- DT → downtrend en progreso
+
+UPTREND PROGRESSION (buscar LONG):
+- SBU → "Mínimo 2+ candles más hasta UTS. No hay trade todavía."
+- SBUC → "Mínimo 1 candle más hasta UTS. Getting closer."
+- UTS → "ESTE ES EL ESTADO ÓPTIMO. Bajar a H4 y buscar zona dentro del anchor. Si ya estás en SBU/SBUC cuando ves esto = missed trade, buscar pullback."
+- UTAB → precio acelerando uptrend, buscar pullback entry
+- UT → uptrend en progreso
+
+REGLAS:
 - UPTREND + action candles bajistas (c<o) → setup LONG
 - DOWNTREND + action candles alcistas (c>o) → setup SHORT
-- Sin setup → WAIT
-- Si action candle rompió el anchor → missed trade → SKIP
+- SBU/SBD sin setup → WAIT (demasiado temprano)
+- Si action candle rompió el anchor → missed trade → buscar pullback
 - LONG: marcar bottom del anchor | SHORT: marcar top del anchor
+- Reportar el estado actual en "market_state" y la proximidad al trade óptimo
 
 ════════════════════════════════
 SEGUNDA PARTE — ENCONTRAR EL NIVEL (en H4)
@@ -319,6 +336,8 @@ RESPONDE en JSON puro sin markdown, reasoning máximo 3 oraciones:
   "trend_daily": "UP" | "DOWN" | "SIDEWAYS",
   "trend_weekly": "UP" | "DOWN" | "SIDEWAYS",
   "impulse_or_corrective": "impulse" | "corrective",
+  "market_state": "SBU" | "SBUC" | "UTS" | "UTAB" | "UT" | "SBD" | "SBDC" | "DTS" | "DTAB" | "DT" | "SIDEWAYS",
+  "proximity_to_trade": "optimal" | "1_candle_away" | "2+_candles_away" | "missed_trade",
   "setup_valid": true | false,
   "anchor_range_high": 1.08800,
   "anchor_range_low": 1.08200,
