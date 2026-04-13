@@ -19,19 +19,47 @@ VELAS (solo BODIES para dirección):
 - Vela BAJISTA (bearish): close < open — Jody la llama ROJA, Oanda la muestra ROJA
 - IGNORAR wicks para determinar dirección
 
-ESTADOS DEL MERCADO EN HTF (H3/H4):
-UPTREND:
-- UTS: action candle bajista (c<o), NO rompió anchor → setup activo
-- UTNS: action candle alcista (c>o) → sin setup, SKIP
-- UTSAB: action candle bajista (c<o) + rompió base del anchor → AB confirmado
-- SBU: lateral, action candle alcista (c>o) NO rompió anchor → esperar
-- SBUC: action candles alcistas (c>o) rompieron anchor → confirmación alcista
-DOWNTREND:
-- DTS: action candle alcista (c>o), NO rompió anchor → setup activo
-- DTNS: action candle bajista (c<o) → sin setup, SKIP
-- DTSAB: action candle alcista (c>o) + rompió base del anchor → AB confirmado
-- SBD: lateral, action candle bajista (c<o) NO rompió anchor → esperar
-- SBDC: action candles bajistas (c<o) rompieron anchor → confirmación bajista
+DETERMINACIÓN DE TREND STATES — 7 PASOS DE JODY (usar BODIES únicamente, ignorar wicks):
+
+PASO 1 — ID ACTION CANDLE:
+- La vela donde está el precio actual + todas las velas del mismo color consecutivas
+- IGNORAR para el análisis de trend
+
+PASO 2 — ID ANCHOR:
+- El grupo de velas del mismo color directamente a la IZQUIERDA de la action candle
+- Marcar HIGH y LOW del anchor usando solo candle bodies
+- Dibujar anchor lines en top y bottom del anchor
+
+PASO 3 — SIDEWAYS?:
+- ¿El previous move (3er color, a la izquierda del anchor) ENGULFA todo el anchor?
+- Si SÍ → SIDEWAYS → continuar para determinar bias UP o DOWN
+- Si NO → sabrás si es UT o DT (el anchor rompió fuera del previous move)
+
+PASO 4 — CLOSEST OPEN (determina UP vs DOWN):
+- Buscar la vela cuyo OPEN está más cercano y FUERA de las anchor lines (a la izquierda)
+- Si ese candle es ROJO (c < o) → DOWNTREND → saltar a paso 6
+- Si ese candle es AZUL (c > o) → UPTREND → saltar a paso 6
+
+PASO 5 — SETUP?:
+- Si UPTREND: ¿la action candle es ROJA (c < o)? SÍ = Setup "S" | NO = Sin setup
+- Si DOWNTREND: ¿la action candle es ROJA (c < o)? SÍ = Sin setup | NO = Setup "S"
+
+PASO 6 — ANCHOR BREAK / CONFIRMATION?:
+- ¿El precio de la action candle está FUERA de las anchor lines?
+- Si SÍ, el trend state es:
+  * UTS → UTAB | DTS → DTAB | SBU → SBUC | SBD → SBDC
+- Si NO, ya tienes tu trend state: UTS, UT, SBU, DTS, DT, o SBD
+
+PASO 7 — HTF CONFLUENCE:
+- UTS Confluence: HTF muestra DTAB, UT, UTS, SBU, SBUC → HTF trend going UP → IMPULSE para LONG
+- DTS Confluence: HTF muestra UTAB, DT, DTS, SBD, SBDC → HTF trend going DOWN → IMPULSE para SHORT
+- Si no hay confluencia → CORRECTIVE trade → 1:1 máximo o SKIP
+- Evaluar si cambiar HTF a ITF y re-evaluar
+- Estar listo para reversals — asegurar que entry y stop no sean trading reversals
+
+ESTADOS RESULTANTES:
+UPTREND: UTS (setup activo) | UTNS (sin setup, SKIP) | UTSAB/UTAB (AB confirmado) | SBU (esperar) | SBUC (confirmación)
+DOWNTREND: DTS (setup activo) | DTNS (sin setup, SKIP) | DTSAB/DTAB (AB confirmado) | SBD (esperar) | SBDC (confirmación)
 
 SETUPS VÁLIDOS: UTS/UTSAB/SBUC → LONG | DTS/DTSAB/SBDC → SHORT
 SKIP SI: UTNS o DTNS en HTF
@@ -213,9 +241,19 @@ PREVIOUS MOVE: grupo de velas del color opuesto al anchor, inmediatamente a su i
 
 SIDEWAYS → SKIP: si todo el anchor está ENGULFED por el previous move (necesita new high o new low)
 
-TREND:
-- UPTREND: LOW del previous move más cercano en tiempo al LOW del anchor
-- DOWNTREND: HIGH del previous move más cercano en tiempo al HIGH del anchor
+TREND — DETERMINACIÓN POR CLOSEST OPEN (7 pasos de Jody):
+PASO 1: Ignorar action candle (precio actual + mismo color)
+PASO 2: Identificar anchor (2do color a la izquierda) — marcar HIGH y LOW con bodies
+PASO 3: Sideways? — ¿previous move (3er color) engulfa el anchor? Si sí = sideways bias
+PASO 4: Closest Open — buscar vela con OPEN más cercano FUERA de las anchor lines:
+  - Si ese candle es ROJO (c < o) → DOWNTREND
+  - Si ese candle es AZUL (c > o) → UPTREND
+PASO 5: Setup — UT + action roja (c<o) = setup LONG | DT + action azul (c>o) = setup SHORT
+PASO 6: ¿Action rompió anchor lines? SÍ → UTS=UTAB, DTS=DTAB, SBU=SBUC, SBD=SBDC
+PASO 7: HTF Confluence:
+  - UTS Confluence: HTF en DTAB/UT/UTS/SBU/SBUC → HTF going UP → IMPULSE para LONG
+  - DTS Confluence: HTF en UTAB/DT/DTS/SBD/SBDC → HTF going DOWN → IMPULSE para SHORT
+  - Sin confluencia → CORRECTIVE → 1:1 máximo o SKIP
 - HTF trend = ITF trend → IMPULSE (más poderoso)
 - HTF trend ≠ ITF trend → CORRECTIVE
 
