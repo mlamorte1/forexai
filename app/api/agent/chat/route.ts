@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { matchTactics, fetchCandles } from '@/lib/agent'
+import { runForexAgent, matchTactics, fetchCandles, fetchNews } from '@/lib/agent'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -32,7 +32,7 @@ LONG: HTF uptrend → M30 corrective move bajista → Pivot Low → velas combin
 SHORT: HTF downtrend → M30 corrective move alcista → Pivot High → velas combinadas rompen 2+ lows → AB abajo
 VELAS COMBINADAS: consecutivas del mismo color sin interrupción = una sola vela de ruptura
 
-FLUJO: 
+FLUJO:
 1. AB + Pivot en M30 (2+ level breaks)
 2. Sale de HTF S/D — si no → fake out → SKIP
 3. BAJAR A M5 OBLIGATORIO: anchor exacto, entry en break line, stop beyond pivot en M5
@@ -61,12 +61,48 @@ WICKS: ODD = establishing = TRADE | EVEN = clearing = SKIP
 Race Track = NO entrar breaking INTO RT
 PIPS: XXX/USD = 0.0001 | XXX/JPY = 0.01
 
-CONCLUSIÓN OBLIGATORIA al analizar:
+CUANDO EL USUARIO PIDE ANÁLISIS DE UN PAR:
+- Los resultados del agente ya vienen incluidos en el contexto como "ANÁLISIS DEL AGENTE"
+- Presenta el análisis de forma clara y conversacional
+- Explica el reasoning en términos simples
+- Si hay señal BUY/SELL: muestra entry, stop, TP claramente
+- Si es WAIT: explica exactamente qué falta para que el trade sea válido
+
+CONCLUSIÓN OBLIGATORIA:
 🎯 SEÑAL: BUY | SELL | WAIT | SKIP
 Entry | Stop | TP | Confianza %
 Si WAIT/SKIP: razón + qué activaría el trade
 
 Disclaimer: No es asesoría financiera.`
+
+// Detect if message is asking for pair analysis
+function extractPairFromMessage(message: string, watchedPairs: string[]): string | null {
+  const msg = message.toUpperCase()
+  for (const pair of watchedPairs) {
+    const formatted = pair.replace('_', '/')
+    if (msg.includes(pair) || msg.includes(formatted)) return pair
+  }
+  // Common aliases
+  const aliases: Record<string, string> = {
+    'EURUSD': 'EUR_USD', 'EURO': 'EUR_USD',
+    'USDJPY': 'USD_JPY', 'YEN': 'USD_JPY',
+    'USDCAD': 'USD_CAD', 'CAD': 'USD_CAD',
+    'EURJPY': 'EUR_JPY',
+    'AUDUSD': 'AUD_USD', 'AUD': 'AUD_USD',
+  }
+  for (const [alias, pair] of Object.entries(aliases)) {
+    if (msg.includes(alias)) return pair
+  }
+  return null
+}
+
+function isAnalysisRequest(message: string): boolean {
+  const keywords = ['analiz', 'setup', 'trade', 'señal', 'signal', 'entry', 'buy', 'sell', 'wait',
+    'anchor break', 'overnight', 'tendencia', 'trend', 'revisar', 'chec', 'como va', 'qué ves',
+    'hay algo', 'oportunidad', 'recomienda']
+  const msg = message.toLowerCase()
+  return keywords.some(k => msg.includes(k))
+}
 
 export async function POST(req: Request) {
   try {
@@ -74,7 +110,7 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { messages, pair } = await req.json()
+    const { messages, pair: selectedPair } = await req.json()
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
@@ -86,77 +122,108 @@ export async function POST(req: Request) {
       .eq('user_id', user.id)
       .single()
 
-    // Get relevant tactics
-    const lastMessage = messages[messages.length - 1]?.content || ''
-    const tactics = await matchTactics(supabase, user.id, lastMessage)
-
-    // Get ALL watched pairs
+    // Get watched pairs
     const { data: watchedPairs } = await supabase
       .from('watched_pairs')
       .select('pair')
       .eq('user_id', user.id)
       .eq('active', true)
 
-    // Build market context for ALL pairs
-    let marketContext = ''
+    const allWatchedPairs = watchedPairs?.map((p: any) => p.pair) || []
 
-    if (cfg && watchedPairs && watchedPairs.length > 0) {
-      const allPairs = watchedPairs.map((p: any) => p.pair)
+    // Get relevant tactics
+    const lastMessage = messages[messages.length - 1]?.content || ''
+    const tactics = await matchTactics(supabase, user.id, lastMessage)
 
-      // Add selected pair if not already in watched pairs
-      if (pair && !allPairs.includes(pair)) allPairs.unshift(pair)
+    // Determine time context
+    const now = new Date()
+    const nyHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }))
+    const isOvernightWindow = nyHour >= 19
 
-      const pairDataSections: string[] = []
+    // ✅ If analysis request — run the REAL agent for mentioned pairs
+    let agentAnalysisContext = ''
 
-      // Fetch candles for all pairs in parallel
-      await Promise.all(allPairs.map(async (p: string) => {
+    if (cfg && isAnalysisRequest(lastMessage)) {
+      // Find which pairs to analyze
+      const mentionedPair = extractPairFromMessage(lastMessage, allWatchedPairs)
+      const pairsToAnalyze = mentionedPair ? [mentionedPair] : allWatchedPairs.slice(0, 3)
+
+      const analyses: string[] = []
+
+      await Promise.all(pairsToAnalyze.map(async (pair: string) => {
         try {
-          const [W, D, H4, H1] = await Promise.all([
-            fetchCandles(cfg.api_key, cfg.environment, p, 'W', 10),
-            fetchCandles(cfg.api_key, cfg.environment, p, 'D', 20),
-            fetchCandles(cfg.api_key, cfg.environment, p, 'H4', 30),
-            fetchCandles(cfg.api_key, cfg.environment, p, 'H1', 20),
-          ])
+          let candles: Record<string, any[]>
 
-          const fmtC = (c: any) => `${c.t.slice(0, 16)} O:${c.o} H:${c.h} L:${c.l} C:${c.c}`
-          const lastH1 = H1[H1.length - 1]
+          if (isOvernightWindow) {
+            const [W, D, H4] = await Promise.all([
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'W', 24),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 30),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 48),
+            ])
+            candles = { W, D, H4 }
+          } else {
+            const [H3, M30, M5] = await Promise.all([
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 48),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 60),
+              fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 24),
+            ])
+            candles = { H3, M30, M5 }
+          }
 
-          pairDataSections.push(`
---- ${p.replace('_', '/')} ---
-Precio actual: ${lastH1?.c || '—'}
+          const [base, quote] = pair.split('_')
+          const newsBase = await fetchNews(base)
+          const newsQuote = await fetchNews(quote)
+          const news = [newsBase, newsQuote].filter(Boolean).join('\n')
 
-Weekly (últimas 5):
-${W.slice(-5).map(fmtC).join('\n')}
+          const analysis = await runForexAgent({
+            pair, candles, positions: [], news, tactics,
+            minConfidence: 65,
+            isOvernightWindow,
+          })
 
-Daily (últimas 10):
-${D.slice(-10).map(fmtC).join('\n')}
-
-H4 (últimas 15):
-${H4.slice(-15).map(fmtC).join('\n')}
-
-H1 (últimas 10):
-${H1.slice(-10).map(fmtC).join('\n')}`)
-        } catch {
-          pairDataSections.push(`\n--- ${p.replace('_', '/')} ---\n[Error obteniendo datos]`)
+          analyses.push(`
+=== ANÁLISIS DEL AGENTE: ${pair.replace('_', '/')} ===
+Señal: ${analysis.signal}
+Confianza: ${analysis.confidence}%
+${analysis.entry ? `Entry: ${analysis.entry}` : ''}
+${analysis.stop_loss ? `Stop: ${analysis.stop_loss}` : ''}
+${analysis.take_profit ? `TP: ${analysis.take_profit}` : ''}
+HTF State: ${analysis.htf_state || analysis.market_state || 'N/A'}
+Skip reason: ${analysis.skip_reason || 'ninguna'}
+Reasoning: ${analysis.reasoning}
+Estrategia: ${isOvernightWindow ? 'Overnight Trade' : 'Anchor Break'}`)
+        } catch (e: any) {
+          analyses.push(`\n=== ${pair} ===\nError: ${e.message}`)
         }
       }))
 
-      marketContext = `
+      agentAnalysisContext = analyses.join('\n')
+    }
 
-=== DATOS DE MERCADO EN TIEMPO REAL (TODOS LOS PARES) ===
-Hora Panama: ${new Date().toLocaleString('es-PA', { timeZone: 'America/Panama' })}
-
-${pairDataSections.join('\n')}
-
-IMPORTANTE: Tienes datos reales de TODOS los pares listados arriba.
-Usa estos datos para tu análisis. NUNCA digas que no tienes datos de un par.`
+    // Build general market context for non-analysis questions
+    let marketContext = ''
+    if (cfg && allWatchedPairs.length > 0 && !agentAnalysisContext) {
+      const pairSections: string[] = []
+      await Promise.all(allWatchedPairs.map(async (p: string) => {
+        try {
+          const [D, H4] = await Promise.all([
+            fetchCandles(cfg.api_key, cfg.environment, p, 'D', 5),
+            fetchCandles(cfg.api_key, cfg.environment, p, 'H4', 6),
+          ])
+          const last = H4[H4.length - 1]
+          pairSections.push(`${p.replace('_', '/')}: ${last?.c || '—'}`)
+        } catch {}
+      }))
+      marketContext = `\n=== PRECIOS ACTUALES ===\n${pairSections.join(' | ')}`
     }
 
     const systemWithContext = `${CHAT_SYSTEM_PROMPT}
 
 === TÁCTICAS DEL USUARIO ===
 ${tactics || 'No hay tácticas guardadas aún'}
-${marketContext}`
+${agentAnalysisContext ? `\n${agentAnalysisContext}` : marketContext}
+Hora EST: ${now.toLocaleString('en-US', { timeZone: 'America/New_York' })}
+Estrategia activa: ${isOvernightWindow ? 'Overnight Trade (W/D/H4)' : 'Anchor Break (H3/M30/M5)'}`
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
@@ -166,7 +233,6 @@ ${marketContext}`
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
-
     const updatedMessages = [...messages, { role: 'assistant', content: reply }]
 
     await supabase
