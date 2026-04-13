@@ -68,25 +68,26 @@ export async function GET(req: Request) {
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
 
-        // ✅ Duplicate check ANTES de fetchear noticias y velas — ahorra Haiku + WebSearch
-        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
-        const activePairs: string[] = []
+        // ✅ Duplicate check por entry price — skip si mismo setup, correr si setup nuevo
+        // Buscar última alerta BUY/SELL por par (últimas 4 horas)
+        const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString()
+        const recentEntries: Record<string, number | null> = {}
         await Promise.all(pairs.map(async ({ pair }: { pair: string }) => {
           const { data: recentAlert } = await supabase
             .from('alerts')
-            .select('id')
+            .select('entry')
             .eq('user_id', cfg.user_id)
             .eq('pair', pair)
             .in('signal', ['BUY', 'SELL'])
-            .gte('created_at', twoHoursAgo)
+            .gte('created_at', fourHoursAgo)
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
-          if (!recentAlert) activePairs.push(pair)
+          recentEntries[pair] = recentAlert?.entry ? parseFloat(recentAlert.entry) : null
         }))
 
-        if (activePairs.length === 0) {
-          return pairs.map(({ pair }: { pair: string }) => ({ pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }))
-        }
+        // Los pares siempre corren — el skip por entry similar ocurre después del análisis
+        const activePairs: string[] = pairs.map(({ pair }: { pair: string }) => pair)
 
         // ✅ News cache solo para pares activos — fetch ForexFactory JSON (sin web_search)
         const activeCurrencySet = new Set<string>()
@@ -96,6 +97,17 @@ export async function GET(req: Request) {
         await Promise.all(activeCurrencies.map(async (currency: string) => {
           newsCache[currency] = await fetchNews(currency)
         }))
+
+
+        // ✅ Helper: verificar si entry es similar al último (mismo setup)
+        const isSameSetup = (pair: string, newEntry: number | null): boolean => {
+          if (!newEntry) return false
+          const lastEntry = recentEntries[pair]
+          if (!lastEntry) return false
+          const pipSize = pair.includes('JPY') ? 0.01 : 0.0001
+          const diffPips = Math.abs(newEntry - lastEntry) / pipSize
+          return diffPips <= 10 // mismo setup si entry difiere menos de 10 pips
+        }
 
         const pairResults = await Promise.all(activePairs.map(async (pair: string) => {
           try {
@@ -131,6 +143,11 @@ export async function GET(req: Request) {
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: true
               })
+
+              // ✅ Skip si mismo setup (entry similar al último)
+              if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
+                return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
+              }
 
               const { data: insertedAlert } = await supabase
                 .from('alerts')
@@ -182,6 +199,11 @@ export async function GET(req: Request) {
               const analysis = await runForexAgent({
                 pair, candles, positions, news, tactics, minConfidence, isOvernightWindow: false
               })
+
+              // ✅ Skip si mismo setup (entry similar al último)
+              if (analysis.send_alert && isSameSetup(pair, analysis.entry)) {
+                return { pair, signal: 'SKIP', reason: 'Mismo setup — entry similar al último' }
+              }
 
               const { data: insertedAlert } = await supabase
                 .from('alerts')
