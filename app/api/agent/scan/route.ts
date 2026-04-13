@@ -68,12 +68,29 @@ export async function GET(req: Request) {
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
 
-        // ✅ Duplicate check por entry price — skip si mismo setup, correr si setup nuevo
-        // Buscar última alerta BUY/SELL por par (últimas 4 horas)
+        // ✅ Duplicate check: skip si hay alerta en últimos 30 min (mismo setup en progreso)
+        // Si pasaron más de 30 min → correr agente (puede haber setup nuevo)
+        const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
         const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString()
         const recentEntries: Record<string, number | null> = {}
+        const activePairs: string[] = []
+
         await Promise.all(pairs.map(async ({ pair }: { pair: string }) => {
-          const { data: recentAlert } = await supabase
+          // Check 1: alerta en últimos 30 min → skip (mismo setup en progreso)
+          const { data: veryRecentAlert } = await supabase
+            .from('alerts')
+            .select('id')
+            .eq('user_id', cfg.user_id)
+            .eq('pair', pair)
+            .in('signal', ['BUY', 'SELL'])
+            .gte('created_at', thirtyMinAgo)
+            .limit(1)
+            .maybeSingle()
+
+          if (veryRecentAlert) return // skip — mismo setup en progreso
+
+          // Check 2: guardar último entry (últimas 4h) para comparar después
+          const { data: lastAlert } = await supabase
             .from('alerts')
             .select('entry')
             .eq('user_id', cfg.user_id)
@@ -83,11 +100,14 @@ export async function GET(req: Request) {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
-          recentEntries[pair] = recentAlert?.entry ? parseFloat(recentAlert.entry) : null
+
+          recentEntries[pair] = lastAlert?.entry ? parseFloat(lastAlert.entry) : null
+          activePairs.push(pair)
         }))
 
-        // Los pares siempre corren — el skip por entry similar ocurre después del análisis
-        const activePairs: string[] = pairs.map(({ pair }: { pair: string }) => pair)
+        if (activePairs.length === 0) {
+          return pairs.map(({ pair }: { pair: string }) => ({ pair, signal: 'SKIP', reason: 'Setup reciente en progreso' }))
+        }
 
         // ✅ News cache solo para pares activos — fetch ForexFactory JSON (sin web_search)
         const activeCurrencySet = new Set<string>()
