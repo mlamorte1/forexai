@@ -540,7 +540,7 @@ export async function fetchCandles(
     if (!res.ok) return []
     const data = await res.json()
     return (data.candles || []).map((c: any) => ({
-      t: new Date(c.time).toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      t: c.time,
       o: parseFloat(c.mid.o),
       h: parseFloat(c.mid.h),
       l: parseFloat(c.mid.l),
