@@ -68,16 +68,36 @@ export async function GET(req: Request) {
         const minConfidence = prefs?.min_confidence ?? 70
         const positions = positionsRaw.positions || []
 
-        // ✅ News cache por moneda única
-        const currencySet = new Set<string>()
-pairs.forEach(({ pair }: { pair: string }) => pair.split('_').forEach((c: string) => currencySet.add(c)))
-const currencies = Array.from(currencySet)
+        // ✅ Duplicate check ANTES de fetchear noticias y velas — ahorra Haiku + WebSearch
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+        const activePairs: string[] = []
+        await Promise.all(pairs.map(async ({ pair }: { pair: string }) => {
+          const { data: recentAlert } = await supabase
+            .from('alerts')
+            .select('id')
+            .eq('user_id', cfg.user_id)
+            .eq('pair', pair)
+            .in('signal', ['BUY', 'SELL'])
+            .gte('created_at', twoHoursAgo)
+            .limit(1)
+            .maybeSingle()
+          if (!recentAlert) activePairs.push(pair)
+        }))
+
+        if (activePairs.length === 0) {
+          return pairs.map(({ pair }: { pair: string }) => ({ pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }))
+        }
+
+        // ✅ News cache solo para pares activos — fetch ForexFactory JSON (sin web_search)
+        const activeCurrencySet = new Set<string>()
+        activePairs.forEach((pair: string) => pair.split('_').forEach((c: string) => activeCurrencySet.add(c)))
+        const activeCurrencies = Array.from(activeCurrencySet)
         const newsCache: Record<string, string> = {}
-        await Promise.all(currencies.map(async (currency: string) => {
+        await Promise.all(activeCurrencies.map(async (currency: string) => {
           newsCache[currency] = await fetchNews(currency)
         }))
 
-        const pairResults = await Promise.all(pairs.map(async ({ pair }: { pair: string }) => {
+        const pairResults = await Promise.all(activePairs.map(async (pair: string) => {
           try {
             const tacticsQuery = isOvernightWindow
               ? `Overnight trade setup ${pair} - Daily trend anchor whitespace H4 level`
@@ -106,21 +126,6 @@ const currencies = Array.from(currencySet)
                 if (minutesAgo > 15) {
                   return { pair, signal: 'SKIP', reason: `Stale data: ${Math.round(minutesAgo)}min ago` }
                 }
-              }
-
-              // ✅ Duplicate check — no enviar el mismo setup dos veces (ventana 2 horas)
-              const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
-              const { data: recentAlertOT } = await supabase
-                .from('alerts')
-                .select('id')
-                .eq('user_id', cfg.user_id)
-                .eq('pair', pair)
-                .in('signal', ['BUY', 'SELL'])
-                .gte('created_at', twoHoursAgo)
-                .limit(1)
-                .maybeSingle()
-              if (recentAlertOT) {
-                return { pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }
               }
 
               const analysis = await runForexAgent({
@@ -172,21 +177,6 @@ const currencies = Array.from(currencySet)
                 if (minutesAgo > 15) {
                   return { pair, signal: 'SKIP', reason: `Stale data: ${Math.round(minutesAgo)}min ago` }
                 }
-              }
-
-              // ✅ Duplicate check — no enviar el mismo setup dos veces (ventana 2 horas)
-              const twoHoursAgo2 = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
-              const { data: recentAlertAB } = await supabase
-                .from('alerts')
-                .select('id')
-                .eq('user_id', cfg.user_id)
-                .eq('pair', pair)
-                .in('signal', ['BUY', 'SELL'])
-                .gte('created_at', twoHoursAgo2)
-                .limit(1)
-                .maybeSingle()
-              if (recentAlertAB) {
-                return { pair, signal: 'SKIP', reason: 'Alerta reciente ya existe' }
               }
 
               const analysis = await runForexAgent({
