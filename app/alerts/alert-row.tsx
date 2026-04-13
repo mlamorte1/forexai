@@ -18,6 +18,8 @@ export default function AlertRow({ alert }: { alert: any }) {
 
   const handleSkip = async (e: React.MouseEvent) => {
   e.stopPropagation()
+  e.preventDefault()
+  console.log('handleSkip called', { alertId: alert.id, outcome })
   if (outcome) return
   setLoading(true)
   try {
