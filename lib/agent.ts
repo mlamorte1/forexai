@@ -102,6 +102,10 @@ function detectAnchorBreak(candles: Candle[], pair: string): AnchorBreakResult {
     if (anchorGroup.color === 'RED' && breakGroup.color === 'GREEN') {
       const breakClose = breakGroup.candles[breakGroup.candles.length - 1].candle.c
       const anchorHighs = anchorGroup.candles.map(({ candle: c }) => Math.max(c.o, c.c))
+      // ⚠️ REGLA CRÍTICA: el close DEBE superar el body high MÁS ALTO del anchor
+      // Solo el close cuenta — wicks NO cuentan para confirmar ruptura
+      const anchorBodyHigh = Math.max(...anchorHighs)
+      if (breakClose <= anchorBodyHigh) continue
       const levelBreaks = anchorHighs.filter(h => breakClose > h).length
 
       if (levelBreaks >= 2) {
@@ -125,6 +129,10 @@ function detectAnchorBreak(candles: Candle[], pair: string): AnchorBreakResult {
     if (anchorGroup.color === 'GREEN' && breakGroup.color === 'RED') {
       const breakClose = breakGroup.candles[breakGroup.candles.length - 1].candle.c
       const anchorLows = anchorGroup.candles.map(({ candle: c }) => Math.min(c.o, c.c))
+      // ⚠️ REGLA CRÍTICA: el close DEBE cerrar por debajo del body low MÁS BAJO del anchor
+      // Solo el close cuenta — wicks NO cuentan para confirmar ruptura
+      const anchorBodyLow = Math.min(...anchorLows)
+      if (breakClose >= anchorBodyLow) continue
       const levelBreaks = anchorLows.filter(l => breakClose < l).length
 
       if (levelBreaks >= 2) {
@@ -221,7 +229,7 @@ function formatCandle(num: number, c: Candle, pair: string, label: string = ''):
 }
 
 // Función principal — traduce OHLC a texto estructurado
-export function buildChartContext(
+function buildChartContext(
   candles: Record<string, any[]>,
   isOvernightWindow: boolean,
   pair: string
@@ -936,3 +944,4 @@ export async function fetchNews(currency: string): Promise<string> {
     return ''
   }
 }
+
