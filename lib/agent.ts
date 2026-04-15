@@ -608,6 +608,13 @@ WICKS: ODD (impar) = establishing = órdenes sin llenar → TRADE | EVEN (par) =
 
 RACE TRACK: zona de impulso fuerte sin pausas — NO entrar breaking INTO RT → reducir TP o SKIP
 
+⚠️ REGLA ABSOLUTA — LEER ANTES DE CUALQUIER ANÁLISIS:
+El pre-procesador matemático ya analizó las velas y determinó si hay un AB válido.
+- Si el chart context M30 NO muestra "✅ AB BUY CONFIRMED" o "✅ AB SELL CONFIRMED" → WAIT obligatorio
+- NUNCA reportar BUY o SELL basado en tu propio análisis visual de las velas
+- El pre-procesador es la ÚNICA fuente de verdad para detectar el AB
+- Si no ves el label "✅ AB ... CONFIRMED" en M30 = no hay AB = WAIT sin excepciones
+
 ════════════════════════════════
 6 PASOS DE JODY (ANCHOR BREAK)
 ════════════════════════════════
@@ -944,4 +951,3 @@ export async function fetchNews(currency: string): Promise<string> {
     return ''
   }
 }
-
