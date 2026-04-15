@@ -215,7 +215,7 @@ export async function GET(req: Request) {
 console.log('[CANDLES OK]', pair, 'H3=' + H3.length, 'M30=' + M30.length, 'M5=' + M5.length)
  console.log('[CHART CONTEXT]', pair, buildChartContext(
   { H3, M30, M5 }, false, pair
-).substring(0, 2000))             
+).substring(0, 4000))             
 const [base_currency, quote_currency] = pair.split('_')
 const news = [newsCache[base_currency], newsCache[quote_currency]].filter(Boolean).join('\n\n')
 const lastM5 = M5[M5.length - 1]
