@@ -12,7 +12,7 @@ export async function sendAlertEmail({
   const signalColor = analysis.signal === 'BUY' ? '#00d4a0' : '#ff4d6a'
   const pairFormatted = analysis.pair?.replace('_', '/') || '—'
   const now = new Date().toLocaleString('es-PA', {
-    timeZone: 'America/Panama',
+    timeZone: 'America/New_York',
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
