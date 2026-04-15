@@ -229,7 +229,7 @@ function formatCandle(num: number, c: Candle, pair: string, label: string = ''):
 }
 
 // Función principal — traduce OHLC a texto estructurado
-function buildChartContext(
+export function buildChartContext(
   candles: Record<string, any[]>,
   isOvernightWindow: boolean,
   pair: string
