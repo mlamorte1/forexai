@@ -4,6 +4,420 @@ import { generateEmbedding } from './openai'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ════════════════════════════════════════════════════════
+// CHART CONTEXT BUILDER
+// Convierte datos OHLC en texto estructurado que el agente
+// puede leer como si estuviera viendo el chart
+// ════════════════════════════════════════════════════════
+
+interface Candle {
+  t: string
+  o: number
+  h: number
+  l: number
+  c: number
+}
+
+interface CandleGroup {
+  color: 'GREEN' | 'RED'
+  candles: Array<{ index: number; candle: Candle }>
+  high: number
+  low: number
+  pivotHigh: number
+  pivotLow: number
+}
+
+interface AnchorBreakResult {
+  found: boolean
+  direction: 'BUY' | 'SELL' | null
+  anchorGroup: CandleGroup | null
+  breakGroup: CandleGroup | null
+  levelBreaks: number
+  entryPrice: number | null
+  stopPrice: number | null
+  anchorStartIndex: number
+  anchorEndIndex: number
+  breakEndIndex: number
+}
+
+function candleColor(c: Candle): 'GREEN' | 'RED' {
+  return c.c > c.o ? 'GREEN' : 'RED'
+}
+
+function colorEmoji(color: 'GREEN' | 'RED'): string {
+  return color === 'GREEN' ? '🟢' : '🔴'
+}
+
+function toPips(value: number, pair: string): number {
+  const pipSize = pair.includes('JPY') ? 0.01 : 0.0001
+  return Math.round(Math.abs(value) / pipSize)
+}
+
+// Agrupa velas consecutivas del mismo color
+function groupByColor(candles: Candle[]): CandleGroup[] {
+  const groups: CandleGroup[] = []
+  let i = 0
+  while (i < candles.length) {
+    const color = candleColor(candles[i])
+    const group: CandleGroup = {
+      color,
+      candles: [],
+      high: -Infinity,
+      low: Infinity,
+      pivotHigh: -Infinity,
+      pivotLow: Infinity,
+    }
+    while (i < candles.length && candleColor(candles[i]) === color) {
+      const c = candles[i]
+      group.candles.push({ index: i, candle: c })
+      group.high = Math.max(group.high, Math.max(c.o, c.c))
+      group.low = Math.min(group.low, Math.min(c.o, c.c))
+      group.pivotHigh = Math.max(group.pivotHigh, c.h)
+      group.pivotLow = Math.min(group.pivotLow, c.l)
+      i++
+    }
+    groups.push(group)
+  }
+  return groups
+}
+
+// Detecta Anchor Break — alcista Y bajista
+function detectAnchorBreak(candles: Candle[], pair: string): AnchorBreakResult {
+  const empty: AnchorBreakResult = {
+    found: false, direction: null, anchorGroup: null, breakGroup: null,
+    levelBreaks: 0, entryPrice: null, stopPrice: null,
+    anchorStartIndex: -1, anchorEndIndex: -1, breakEndIndex: -1
+  }
+
+  if (candles.length < 4) return empty
+
+  const groups = groupByColor(candles)
+  if (groups.length < 2) return empty
+
+  // Buscar el AB más reciente de derecha a izquierda
+  for (let g = groups.length - 1; g >= 1; g--) {
+    const breakGroup = groups[g]
+    const anchorGroup = groups[g - 1]
+
+    // AB ALCISTA: anchor=RED, break=GREEN
+    if (anchorGroup.color === 'RED' && breakGroup.color === 'GREEN') {
+      const breakClose = breakGroup.candles[breakGroup.candles.length - 1].candle.c
+      const anchorHighs = anchorGroup.candles.map(({ candle: c }) => Math.max(c.o, c.c))
+      const levelBreaks = anchorHighs.filter(h => breakClose > h).length
+
+      if (levelBreaks >= 2) {
+        const buffer = pair.includes('JPY') ? 0.04 : 0.0004
+        return {
+          found: true,
+          direction: 'BUY',
+          anchorGroup,
+          breakGroup,
+          levelBreaks,
+          entryPrice: breakClose,
+          stopPrice: anchorGroup.pivotLow - buffer,
+          anchorStartIndex: anchorGroup.candles[0].index,
+          anchorEndIndex: anchorGroup.candles[anchorGroup.candles.length - 1].index,
+          breakEndIndex: breakGroup.candles[breakGroup.candles.length - 1].index,
+        }
+      }
+    }
+
+    // AB BAJISTA: anchor=GREEN, break=RED
+    if (anchorGroup.color === 'GREEN' && breakGroup.color === 'RED') {
+      const breakClose = breakGroup.candles[breakGroup.candles.length - 1].candle.c
+      const anchorLows = anchorGroup.candles.map(({ candle: c }) => Math.min(c.o, c.c))
+      const levelBreaks = anchorLows.filter(l => breakClose < l).length
+
+      if (levelBreaks >= 2) {
+        const buffer = pair.includes('JPY') ? 0.04 : 0.0004
+        return {
+          found: true,
+          direction: 'SELL',
+          anchorGroup,
+          breakGroup,
+          levelBreaks,
+          entryPrice: breakClose,
+          stopPrice: anchorGroup.pivotHigh + buffer,
+          anchorStartIndex: anchorGroup.candles[0].index,
+          anchorEndIndex: anchorGroup.candles[anchorGroup.candles.length - 1].index,
+          breakEndIndex: breakGroup.candles[breakGroup.candles.length - 1].index,
+        }
+      }
+    }
+  }
+
+  return empty
+}
+
+// Detecta trend state usando los 7 pasos de Jody
+function detectTrendState(candles: Candle[]): string {
+  const groups = groupByColor(candles)
+  if (groups.length < 3) return 'UNKNOWN'
+
+  const action = groups[groups.length - 1]
+  const anchor = groups[groups.length - 2]
+  const prevMove = groups[groups.length - 3]
+
+  // Paso 3: Sideways?
+  const isSideways = prevMove.pivotHigh > anchor.pivotHigh && prevMove.pivotLow < anchor.pivotLow
+
+  if (isSideways) {
+    const lastActionCandle = action.candles[action.candles.length - 1].candle
+    const brokeAnchorHigh = lastActionCandle.c > anchor.high
+    const brokeAnchorLow = lastActionCandle.c < anchor.low
+    if (brokeAnchorHigh) return 'SBUC'
+    if (brokeAnchorLow) return 'SBDC'
+    if (action.color === 'RED') return 'SBD'
+    return 'SBU'
+  }
+
+  // Paso 4: Closest Open — determina UT o DT
+  const isUptrend = anchor.color === 'RED'
+
+  if (isUptrend) {
+    const lastActionCandle = action.candles[action.candles.length - 1].candle
+    const hasSetup = action.color === 'RED'
+    const brokeAnchor = lastActionCandle.c > anchor.high
+    if (brokeAnchor) return 'UTAB'
+    if (hasSetup) return 'UTS'
+    return 'UTNS'
+  } else {
+    const lastActionCandle = action.candles[action.candles.length - 1].candle
+    const hasSetup = action.color === 'GREEN'
+    const brokeAnchor = lastActionCandle.c < anchor.low
+    if (brokeAnchor) return 'DTAB'
+    if (hasSetup) return 'DTS'
+    return 'DTNS'
+  }
+}
+
+// Calcula ATR de las últimas N velas
+function calcATR(candles: Candle[], period: number = 14): number {
+  if (candles.length < 2) return 0
+  const slice = candles.slice(-period - 1)
+  let trSum = 0
+  let count = 0
+  for (let i = 1; i < slice.length; i++) {
+    const c = slice[i]
+    const prev = slice[i - 1]
+    const tr = Math.max(c.h - c.l, Math.abs(c.h - prev.c), Math.abs(c.l - prev.c))
+    trSum += tr
+    count++
+  }
+  return count > 0 ? trSum / count : 0
+}
+
+// Formatea una vela como línea de texto legible
+function formatCandle(num: number, c: Candle, pair: string, label: string = ''): string {
+  const color = candleColor(c)
+  const emoji = colorEmoji(color)
+  const bodyPips = toPips(Math.abs(c.c - c.o), pair)
+  const sign = color === 'GREEN' ? '+' : '-'
+  const wickDown = toPips(Math.min(c.o, c.c) - c.l, pair)
+  const wickUp = toPips(c.h - Math.max(c.o, c.c), pair)
+  const time = c.t.length > 10 ? c.t.substring(11, 16) : c.t
+  const decimals = pair.includes('JPY') ? 3 : 5
+  const labelStr = label ? ` ← ${label}` : ''
+  return `#${String(num).padStart(2, '0')} [${time}] ${emoji} ${sign}${bodyPips}p | ${c.o.toFixed(decimals)}→${c.c.toFixed(decimals)} | ↓${wickDown}p ↑${wickUp}p${labelStr}`
+}
+
+// Función principal — traduce OHLC a texto estructurado
+function buildChartContext(
+  candles: Record<string, any[]>,
+  isOvernightWindow: boolean,
+  pair: string
+): string {
+  const lines: string[] = []
+
+  if (!isOvernightWindow) {
+    // ════════════════════════════════
+    // ANCHOR BREAK — H3 / M30 / M5
+    // ════════════════════════════════
+
+    // H3: Trend State
+    const H3: Candle[] = candles.H3 || []
+    if (H3.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('H3 — TREND STATE (HTF)')
+      lines.push('════════════════════════════════')
+      const trendState = detectTrendState(H3)
+      const groups = groupByColor(H3)
+      const last3 = groups.slice(-3)
+      const labels = ['PREV MOVE', 'ANCHOR', 'ACTION']
+      last3.forEach((g, i) => {
+        const lbl = labels[i] || ''
+        lines.push(`${lbl}: ${g.candles.length} velas ${colorEmoji(g.color)} | body_high:${g.high.toFixed(3)} body_low:${g.low.toFixed(3)} | wick_high:${g.pivotHigh.toFixed(3)} wick_low:${g.pivotLow.toFixed(3)}`)
+      })
+      lines.push(`>>> TREND STATE H3: ${trendState}`)
+      lines.push('')
+    }
+
+    // M30: Anchor Break Detection
+    const M30: Candle[] = candles.M30 || []
+    if (M30.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('M30 — ANCHOR BREAK DETECTION')
+      lines.push('════════════════════════════════')
+
+      const ab = detectAnchorBreak(M30, pair)
+      const startIdx = Math.max(0, M30.length - 40)
+
+      M30.slice(startIdx).forEach((c, i) => {
+        const globalIdx = startIdx + i
+        const num = i + 1
+        let label = ''
+        if (ab.found) {
+          if (globalIdx === ab.anchorStartIndex) label = 'ANCHOR START'
+          else if (globalIdx > ab.anchorStartIndex && globalIdx < ab.anchorEndIndex) label = 'ANCHOR'
+          else if (globalIdx === ab.anchorEndIndex) {
+            const pivot = ab.direction === 'BUY'
+              ? ab.anchorGroup!.pivotLow.toFixed(3)
+              : ab.anchorGroup!.pivotHigh.toFixed(3)
+            label = `ANCHOR END | PIVOT: ${pivot}`
+          }
+          else if (globalIdx > ab.anchorEndIndex && globalIdx < ab.breakEndIndex) label = 'BREAK'
+          else if (globalIdx === ab.breakEndIndex) label = `✅ AB ${ab.direction} CONFIRMED — ${ab.levelBreaks} level breaks`
+        }
+        lines.push(formatCandle(num, c, pair, label))
+      })
+
+      lines.push('')
+      if (ab.found) {
+        const velsDesdeAB = M30.length - 1 - ab.breakEndIndex
+        const isFresh = velsDesdeAB <= 3
+        lines.push(`════ AB ${ab.direction} DETECTADO ════`)
+        lines.push(`Level breaks: ${ab.levelBreaks}`)
+        lines.push(`Entry referencia M30: ${ab.entryPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+        lines.push(`Stop referencia M30: ${ab.stopPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+        lines.push(`Velas M30 desde AB hasta ahora: ${velsDesdeAB}`)
+        lines.push(`FRESHNESS: ${isFresh ? '✅ VÁLIDO (≤3 velas)' : '❌ STALE — reportar WAIT'}`)
+      } else {
+        lines.push('════ SIN AB VÁLIDO EN M30 ════')
+        lines.push('No se detectó anchor break con 2+ level breaks sin interrupción → WAIT')
+      }
+      lines.push('')
+    }
+
+    // M5: Entry y Stop precisos
+    const M5: Candle[] = candles.M5 || []
+    if (M5.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('M5 — ENTRY ZONE (LTF)')
+      lines.push('════════════════════════════════')
+
+      const abM5 = detectAnchorBreak(M5, pair)
+
+      M5.forEach((c, i) => {
+        let label = ''
+        if (abM5.found) {
+          if (i === abM5.anchorStartIndex) label = 'ANCHOR M5 START'
+          else if (i > abM5.anchorStartIndex && i < abM5.anchorEndIndex) label = 'ANCHOR M5'
+          else if (i === abM5.anchorEndIndex) label = `ANCHOR M5 END | STOP: ${abM5.stopPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`
+          else if (i > abM5.anchorEndIndex && i < abM5.breakEndIndex) label = 'BREAK M5'
+          else if (i === abM5.breakEndIndex) label = `✅ ENTRY M5: ${abM5.entryPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`
+        }
+        lines.push(formatCandle(i + 1, c, pair, label))
+      })
+
+      lines.push('')
+      if (abM5.found) {
+        lines.push(`════ ENTRY M5 ${abM5.direction} ════`)
+        lines.push(`Entry: ${abM5.entryPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+        lines.push(`Stop: ${abM5.stopPrice?.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+        lines.push(`Level breaks M5: ${abM5.levelBreaks}`)
+      } else {
+        lines.push('════ SIN AB EN M5 ════')
+        lines.push('No hay AB claro en M5 — usar entry tipo pullback o CC en M1')
+      }
+      lines.push('')
+    }
+
+  } else {
+    // ════════════════════════════════
+    // OVERNIGHT TRADE — W / D / H4
+    // ════════════════════════════════
+
+    // Weekly: Curve y HTF
+    const W: Candle[] = candles.W || []
+    if (W.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('WEEKLY — CURVE / HTF CONTEXT')
+      lines.push('════════════════════════════════')
+      const trendW = detectTrendState(W)
+      const groupsW = groupByColor(W)
+      const lastW = groupsW[groupsW.length - 1]
+      lines.push(`>>> TREND STATE WEEKLY: ${trendW}`)
+      lines.push(`Último grupo: ${lastW.candles.length} velas ${colorEmoji(lastW.color)} | high:${lastW.pivotHigh.toFixed(3)} low:${lastW.pivotLow.toFixed(3)}`)
+      W.slice(-8).forEach((c, i) => lines.push(formatCandle(W.length - 8 + i + 1, c, pair)))
+      lines.push('')
+    }
+
+    // Daily: Trend + Setup
+    const D: Candle[] = candles.D || []
+    if (D.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('DAILY — TREND + SETUP')
+      lines.push('════════════════════════════════')
+      const trendD = detectTrendState(D)
+      const groupsD = groupByColor(D)
+      const last3D = groupsD.slice(-3)
+      const labels = ['PREV MOVE', 'ANCHOR', 'ACTION']
+      last3D.forEach((g, i) => {
+        const lbl = labels[i] || ''
+        lines.push(`${lbl}: ${g.candles.length} velas ${colorEmoji(g.color)} | body_high:${g.high.toFixed(3)} body_low:${g.low.toFixed(3)}`)
+      })
+      lines.push(`>>> TREND STATE DAILY: ${trendD}`)
+      lines.push('')
+      D.slice(-20).forEach((c, i) => lines.push(formatCandle(D.length - 20 + i + 1, c, pair)))
+      lines.push('')
+    }
+
+    // H4: Entry Zone + ATR Box
+    const H4: Candle[] = candles.H4 || []
+    if (H4.length > 0) {
+      lines.push('════════════════════════════════')
+      lines.push('H4 — ENTRY ZONE + ATR BOX')
+      lines.push('════════════════════════════════')
+      const atr = calcATR(H4, 14)
+      const atr120 = atr * 1.2
+      lines.push(`ATR H4 (14 velas): ${atr.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+      lines.push(`ATR 120%: ${atr120.toFixed(pair.includes('JPY') ? 3 : 5)}`)
+      lines.push('')
+
+      const abH4 = detectAnchorBreak(H4, pair)
+      const startH4 = Math.max(0, H4.length - 24)
+      H4.slice(startH4).forEach((c, i) => {
+        const globalIdx = startH4 + i
+        let label = ''
+        if (abH4.found) {
+          if (globalIdx === abH4.anchorStartIndex) label = 'ZONA START'
+          else if (globalIdx === abH4.anchorEndIndex) label = `ZONA END | PIVOT: ${abH4.direction === 'BUY' ? abH4.anchorGroup!.pivotLow.toFixed(3) : abH4.anchorGroup!.pivotHigh.toFixed(3)}`
+          else if (globalIdx === abH4.breakEndIndex) label = `BIG MOVE OUT ${abH4.direction}`
+        }
+        lines.push(formatCandle(i + 1, c, pair, label))
+      })
+
+      lines.push('')
+      if (abH4.found) {
+        const entryRef = abH4.entryPrice || 0
+        const boxTop = abH4.direction === 'BUY' ? entryRef : entryRef + atr120
+        const boxBottom = abH4.direction === 'BUY' ? entryRef - atr120 : entryRef
+        const dec = pair.includes('JPY') ? 3 : 5
+        lines.push(`════ ZONA H4 ${abH4.direction} ════`)
+        lines.push(`Box top: ${boxTop.toFixed(dec)} | Box bottom: ${boxBottom.toFixed(dec)}`)
+        lines.push(`Entry (${abH4.direction === 'BUY' ? 'top' : 'bottom'} del box): ${(abH4.direction === 'BUY' ? boxTop : boxBottom).toFixed(dec)}`)
+        lines.push(`Stop (${abH4.direction === 'BUY' ? 'bottom' : 'top'} del box): ${(abH4.direction === 'BUY' ? boxBottom : boxTop).toFixed(dec)}`)
+      } else {
+        lines.push('════ SIN ZONA CLARA EN H4 ════')
+        lines.push('Revisar manualmente zona S/D con odds enhancers dentro del anchor Daily')
+      }
+      lines.push('')
+    }
+  }
+
+  return lines.join('\n')
+}
+
+// ════════════════════════════════════════════════════════
 // ANCHOR BREAK SYSTEM PROMPT (antes de 7PM EST)
 // Timeframes: H3/H4 → M30 → M5
 // ════════════════════════════════════════════════════════
@@ -40,6 +454,31 @@ KEY 3 — RACETRACK (Impulse):
 - ¿El precio está en zona de impulso fuerte sin pausas (Race Track)?
 - Entrar INTO un Race Track → SKIP o reducir TP significativamente
 - Race Track confirma la dirección pero NO es zona de entry válida
+
+════════════════════════════════════════════════════════
+CÓMO LEER EL CHART CONTEXT QUE RECIBES
+════════════════════════════════════════════════════════
+Los datos de velas vienen pre-procesados en este formato:
+#01 [08:30] 🟢 +7p | 187.210→187.280 | ↓3p ↑5p ← ANCHOR START
+
+Donde:
+- #01 = número de vela (cronológico, #01 es la más antigua)
+- [08:30] = hora de apertura
+- 🟢/🔴 = color (verde=alcista c>o, roja=bajista c<o)
+- +7p/-7p = movimiento del body en pips
+- 187.210→187.280 = open→close
+- ↓3p ↑5p = wick inferior y wick superior en pips
+- ← LABEL = identificación estructural (ANCHOR, BREAK, PIVOT, etc.)
+
+El pre-procesador ya identificó matemáticamente:
+- ANCHOR START / ANCHOR END: las velas del anchor
+- PIVOT: el wick más extremo del anchor (referencia del stop)
+- BREAK: las velas de ruptura
+- AB CONFIRMED: la vela donde se confirma el AB con N level breaks
+- FRESHNESS: si el AB es válido (≤3 velas M30 desde el break)
+
+Tu trabajo es CONFIRMAR y VALIDAR lo que el pre-procesador detectó,
+aplicando los 7 pasos de Jody y las 3 Keys antes de dar una señal.
 
 ════════════════════════════════════════════════════════
 DETERMINACIÓN DE TREND STATES — 7 PASOS DE JODY
@@ -108,80 +547,25 @@ CONTEXTO:
 - HTF uptrend (UTAB/UT/UTS/SBU/SBUC) → M30 corrective move bajista → fin corrección → AB arriba
 - ASK price para BUY
 
-QUÉ BUSCAR EN M30:
-1. Serie de velas BAJISTAS (c < o) consecutivas — corrective move CONTRA el HTF uptrend
-2. El precio deja de hacer nuevos lows — formación del PIVOT LOW
+FLUJO:
+1. Verificar label "AB BUY CONFIRMED" en M30 con FRESHNESS ✅
+2. Verificar trend state H3 — debe ser alcista
+3. Bajar a M5 — usar label "ENTRY M5" y "STOP" del pre-procesador
+4. Confirmar level breaks ≥ 2 en M5
+5. Verificar whitespace hasta TP
+6. TP = high más cercano ANTES del corrective move en M30
 
-3. PIVOT LOW — DEFINICIÓN EXACTA:
-   ⚠️ El pivot LOW NO es el low del corrective move completo.
-   - El pivot es el wick "l" más bajo de las velas que forman el ANCHOR específicamente
-   - El anchor = el grupo de velas (generalmente 2-3) que están en el fondo del corrective move, justo antes de la vela de ruptura
-   - Ejemplo: si el corrective move tiene 8 velas bajistas y las últimas 2 forman el anchor, el pivot es el wick más bajo de ESAS 2 velas — no el low de las 8
-   - El stop se coloca beyond el pivot del ANCHOR, no beyond el low de todo el corrective move
-   - Usar el low del corrective move completo como pivot = stop demasiado amplio = ERROR
+PIVOT LOW — DEFINICIÓN EXACTA:
+⚠️ El pivot es el wick "l" más bajo de las velas del ANCHOR específicamente
+— NO el low del corrective move completo
 
-4. VELAS COMBINADAS — REGLA CRÍTICA:
-   - Velas consecutivas del MISMO COLOR sin ninguna interrupción = se combinan como una sola vela de ruptura
-   - ⚠️ UNA SOLA vela del color opuesto entre medias = ROMPE la combinación = NO es AB válido = WAIT
-   - Ejemplo VÁLIDO: verde + verde + verde = combinación válida, puede ser AB
-   - Ejemplo INVÁLIDO: verde + roja (aunque pequeña) + verde = combinación rota = NO es AB = WAIT
-   - El tamaño de la vela de interrupción NO importa — cualquier vela del color opuesto invalida la combinación
-   - Esta vela combinada (sin interrupción) es la que debe superar 2+ highs del corrective move
+VELAS COMBINADAS — REGLA CRÍTICA:
+⚠️ UNA SOLA vela del color opuesto = combinación ROTA = NO es AB = WAIT
+El pre-procesador ya verifica esto — si no hay label "AB CONFIRMED" → WAIT
 
-5. IDENTIFICACIÓN DEL ANCHOR BREAK:
-   - Toma los valores "h" (high) de las velas bajistas (c < o) del corrective move
-   - La vela combinada de ruptura (mismo color, sin interrupción) es válida cuando su "c" final supera 2+ de esos highs
-   - Cuenta cuántos highs fueron superados = número de level breaks
-   - Mínimo 2 level breaks para considerar el AB válido
-
-6. BAJAR A M5 — OBLIGATORIO:
-   Una vez identificado el AB y el Pivot Low en M30, SIEMPRE bajar a M5 para:
-   - Identificar el anchor exacto en M5 (la vela que causó el break dentro de la vela de impulso M30)
-   - Determinar la break line del anchor M5 → esa es la zona de entry
-   - Colocar el stop beyond el pivot en M5 (más preciso que M30)
-   - Verificar wicks en M5: ODD = trade, EVEN = skip
-
-7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5 o M1):
-
-   a. BREAKOUT DIRECTO:
-      - Entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
-      - No esperar cierre de vela — entrar durante el movimiento
-
-   b. PULLBACK AL NIVEL ROTO:
-      - Esperar que el precio regrese al high del corrective move (ahora soporte)
-      - Entry INFERIOR al precio actual para BUY — NUNCA el precio actual
-      - Más conservador, mejor R:R
-
-   c. CC EN SMALLER TF (Color Change — más conservador):
-      - Usado cuando el precio ya completó el pullback pero NO dejó zona clara en M5
-      - Bajar a M5 y/o M1 — buscar que el precio complete su pullback, luego:
-        * Esperar Color Change (CC) en M1: primera vela alcista (c > o) después de serie bajista
-        * Buscar AB en M3/M5 como confirmación adicional
-      - CC/AB Stop y Entry rules aplican igual
-      - Este es el entry más transparente (mayor probabilidad) aunque más conservador
-      - DZ no es necesario, pero si se encuentra es un odds enhancer — no un requisito
-
-   Para BUY usar ASK price en todos los casos
-
-8. ESCENARIO CONTINUED TREND (UTS sin zona en M5):
-   - Contexto: M30 en UTS, impulse move completado, precio en pullback
-   - No hay zona clara en M5 para entry directo
-   - Reglas:
-     1. Debe haber setup válido y profit potential suficiente
-     2. Esperar que precio complete su pullback
-     3. Buscar CC en M5/M1 + AB en M3/M5
-     4. CC/AB Stop y Entry rules aplican
-
-9. STOP PLACEMENT (basado en M5):
-   - Stop = low del Pivot Low en M5 menos buffer (beyond the pivot)
-   - Para XXX/USD: buffer = 0.0003-0.0005
-   - Para XXX/JPY: buffer = 0.03-0.05
-   - NUNCA en whitespace — siempre beyond the lowest wick del pivot en M5
-
-10. TAKE PROFIT:
-    - El high más cercano alcanzado ANTES del corrective move actual en M30
-    - El siguiente barrier visible en M30 — achievable pips
-    - NO buscar home runs
+ENTRY (M5): breakout | pullback al nivel roto | CC en M1 (BRB)
+STOP: beyond pivot del ANCHOR en M5 + buffer (USD: 0.0003-0.0005 | JPY: 0.03-0.05)
+TP: high más cercano ANTES del corrective move en M30
 
 ════════════════════════════════
 ANCHOR BREAK SHORT (SELL)
@@ -190,74 +574,26 @@ CONTEXTO:
 - HTF downtrend (DTAB/DT/DTS/SBD/SBDC) → M30 corrective move alcista → fin corrección → AB abajo
 - BID price para SELL
 
-QUÉ BUSCAR EN M30:
-1. Serie de velas ALCISTAS (c > o) consecutivas — corrective move CONTRA el HTF downtrend
-2. El precio deja de hacer nuevos highs — formación del PIVOT HIGH
+FLUJO:
+1. Verificar label "AB SELL CONFIRMED" en M30 con FRESHNESS ✅
+2. Verificar trend state H3 — debe ser bajista
+3. Bajar a M5 — usar label "ENTRY M5" y "STOP" del pre-procesador
+4. Confirmar level breaks ≥ 2 en M5
+5. Verificar whitespace hasta TP
+6. TP = low más cercano ANTES del corrective move en M30
 
-3. PIVOT HIGH — DEFINICIÓN EXACTA:
-   ⚠️ El pivot HIGH NO es el high del corrective move completo.
-   - El pivot es el wick "h" más alto de las velas que forman el ANCHOR específicamente
-   - El anchor = el grupo de velas (generalmente 2-3) en el tope del corrective move, justo antes de la vela de ruptura
-   - El stop se coloca beyond el pivot del ANCHOR, no beyond el high de todo el corrective move
+PIVOT HIGH — DEFINICIÓN EXACTA:
+⚠️ El pivot es el wick "h" más alto de las velas del ANCHOR específicamente
+— NO el high del corrective move completo
 
-4. VELAS COMBINADAS — REGLA CRÍTICA:
-   - Velas consecutivas del MISMO COLOR sin ninguna interrupción = se combinan como una sola vela de ruptura
-   - ⚠️ UNA SOLA vela del color opuesto entre medias = ROMPE la combinación = NO es AB válido = WAIT
-   - Ejemplo VÁLIDO: roja + roja + roja = combinación válida, puede ser AB
-   - Ejemplo INVÁLIDO: roja + verde (aunque pequeña) + roja = combinación rota = NO es AB = WAIT
-   - El tamaño de la vela de interrupción NO importa — cualquier vela del color opuesto invalida la combinación
-   - Esta vela combinada (sin interrupción) es la que debe romper por debajo de 2+ lows del corrective move
-
-5. IDENTIFICACIÓN DEL ANCHOR BREAK:
-   - Toma los valores "l" (low) de las velas alcistas (c > o) del corrective move
-   - La vela combinada de ruptura (mismo color, sin interrupción) es válida cuando su "c" final rompe por debajo de 2+ de esos lows
-   - Mínimo 2 level breaks para considerar el AB válido
-
-6. BAJAR A M5 — OBLIGATORIO:
-   Una vez identificado el AB y el Pivot High en M30, SIEMPRE bajar a M5 para:
-   - Identificar el anchor exacto en M5
-   - Determinar la break line del anchor M5 → zona de entry
-   - Colocar el stop beyond el pivot en M5
-   - Verificar wicks en M5: ODD = trade, EVEN = skip
-
-7. ENTRY — 3 opciones en orden de precisión (todas se identifican en M5 o M1):
-
-   a. BREAKOUT DIRECTO:
-      - Entrar cuando las velas de ruptura en M5 están corriendo — más agresivo
-
-   b. PULLBACK AL NIVEL ROTO:
-      - Esperar que el precio regrese al low del corrective move (ahora resistencia)
-      - Entry SUPERIOR al precio actual para SELL — NUNCA el precio actual
-
-   c. CC EN SMALLER TF (Color Change — más conservador):
-      - Usado cuando precio ya completó pullback pero NO dejó zona clara en M5
-      - Bajar a M5/M1 — esperar CC bajista (primera vela roja c < o después de serie alcista)
-      - Buscar AB en M3/M5 como confirmación
-      - CC/AB Stop y Entry rules aplican
-      - DZ (SZ) no es necesario — es odds enhancer
-
-   Para SELL usar BID price en todos los casos
-
-8. ESCENARIO CONTINUED TREND (DTS sin zona en M5):
-   - Mismo proceso que para LONG pero en dirección SHORT
-   - Esperar pullback → CC bajista en M5/M1 → AB en M3/M5
-
-9. STOP PLACEMENT (basado en M5):
-   - Stop = high del Pivot High en M5 más buffer (beyond the pivot)
-   - Para XXX/USD: buffer = 0.0003-0.0005
-   - Para XXX/JPY: buffer = 0.03-0.05
-   - NUNCA en whitespace — siempre beyond the highest wick del pivot en M5
-
-10. TAKE PROFIT:
-    - El low más cercano alcanzado ANTES del corrective move actual en M30
-    - El siguiente barrier visible en M30 — achievable pips
-    - NO buscar home runs
+ENTRY (M5): breakout | pullback al nivel roto | CC en M1 (RBR)
+STOP: beyond pivot del ANCHOR en M5 + buffer (USD: 0.0003-0.0005 | JPY: 0.03-0.05)
+TP: low más cercano ANTES del corrective move en M30
 
 ════════════════════════════════
 WHITESPACE Y WICKS
 ════════════════════════════════
 WHITESPACE: espacio limpio sin price action previa entre entry y target
-- Tipos: wick against wall, wick over wick overlap, descending/ascending wicks
 - Sin whitespace → SKIP
 
 WICKS: ODD (impar) = establishing = órdenes sin llenar → TRADE | EVEN (par) = clearing → SKIP
@@ -267,24 +603,20 @@ RACE TRACK: zona de impulso fuerte sin pausas — NO entrar breaking INTO RT →
 ════════════════════════════════
 6 PASOS DE JODY (ANCHOR BREAK)
 ════════════════════════════════
-PASO 1: ¿AB claro en M30? Serie bajista/alcista terminó → Pivot Low/High formado → velas combinadas rompen 2+ niveles. Si NO → WAIT
+PASO 1: ¿Label "AB CONFIRMED" presente en M30 con FRESHNESS ✅? Si NO → WAIT
 PASO 2: ¿Saliendo de HTF S/D (H3/H4)? Si NO → probable fake out → WAIT
-PASO 3: Baja a M5 en la zona del Pivot Low/High del M30. Identifica el anchor en M5. Entry en la break line del anchor M5. Stop cubre el pivot en M5. Wicks ODD = trade, EVEN = skip
-PASO 4: ¿Cuántos level breaks en M5? Mínimo 2+. Más breaks = mayor confidence
-PASO 5: ¿Dirección del AB = trend HTF? Si SÍ (Impulse) → 2:1. Si NO → 1:1 o SKIP
-PASO 6: ¿Whitespace suficiente hasta barrier? ¿Race Track? RT → reducir TP. Sin profit potential → WAIT
+PASO 3: Usar entry y stop del label M5. Wicks ODD = trade, EVEN = skip
+PASO 4: ¿Level breaks M5 ≥ 2? Más breaks = mayor confidence
+PASO 5: ¿Dirección AB = trend HTF? SÍ (Impulse) → 2:1 | NO → 1:1 o SKIP
+PASO 6: ¿Whitespace suficiente? ¿Race Track? RT → reducir TP. Sin profit → WAIT
 
-CRÍTICO — FRESCURA DEL ANÁLISIS (SIN EXCEPCIONES):
-- Analiza ÚNICAMENTE el Anchor Break más reciente en los datos de M30
-- Si hay múltiples ABs en las velas disponibles, reporta SOLO el último
-- ⚠️ Cuenta las velas M30 desde la vela de ruptura (AB) hasta la última vela disponible
-- Si hay MÁS DE 3 velas M30 entre el AB y la última vela → WAIT obligatorio, sin excepciones
-- Ejemplo: AB en vela 57 de 60, última vela es 60 → 3 velas de diferencia → válido
-- Ejemplo: AB en vela 50 de 60, última vela es 60 → 10 velas = 300 minutos → WAIT
-- No reportar setups históricos aunque sean técnicamente perfectos
-- Un AB de hace 9 horas NO es válido aunque la dirección sea correcta
+CRÍTICO — FRESCURA:
+- El pre-procesador ya calculó "Velas M30 desde AB"
+- Si dice FRESHNESS ❌ STALE → reportar WAIT obligatorio sin excepciones
 
-SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D, breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF sin confirmación, interest rate news
+SKIP SI: UTNS/DTNS en HTF, menos de 2 level breaks, no saliendo de HTF S/D,
+breaking INTO RT, wicks EVEN, sin whitespace, sideways HTF, interest rate news,
+FRESHNESS ❌ en M30
 
 PIPS: XXX/USD = 0.0001 | XXX/JPY = 0.01
 
@@ -333,129 +665,77 @@ VELAS (solo BODIES para dirección):
 - Vela BAJISTA (bearish): close < open — Jody la llama ROJA, Oanda la muestra ROJA
 - IGNORAR wicks para determinar trend y dirección
 
+════════════════════════════════════════════════════════
+CÓMO LEER EL CHART CONTEXT QUE RECIBES
+════════════════════════════════════════════════════════
+Los datos vienen pre-procesados:
+- TREND STATE WEEKLY / DAILY: estado ya calculado
+- PREV MOVE / ANCHOR / ACTION: grupos de color identificados
+- ATR H4 y ATR 120%: ya calculados matemáticamente
+- ZONA START / ZONA END / BIG MOVE OUT: zona S/D en H4 identificada
+- Box top / Box bottom: calculados con ATR 120%
+
+Tu trabajo es VALIDAR con los odds enhancers (big move, basing candle,
+freshness, authenticity, whitespace, profit potential) y confirmar la señal.
+
 ════════════════════════════════
 PRIMERA PARTE — TREND Y SETUP (en Daily)
 ════════════════════════════════
 PASO 1: ID ACTION CANDLE — precio actual + todas las velas del mismo color consecutivas → IGNORAR para trend
-PASO 2: ID ANCHOR (2do color) — grupo de velas del mismo color a la izquierda de la action candle → marcar HIGH y LOW usando solo bodies → dibujar anchor lines
-PASO 3: SIDEWAYS? — ¿previous move (3er color) engulfa el anchor completamente? Si SÍ = SIDEWAYS → buscar bias. Si NO = trend claro
-PASO 4: CLOSEST OPEN — buscar vela con OPEN más cercano FUERA de las anchor lines:
-  - Si ese candle es ROJO (c < o) → DOWNTREND
-  - Si ese candle es AZUL (c > o) → UPTREND
-PASO 5: SETUP — UT + action ROJA (c<o) = setup LONG | DT + action AZUL (c>o) = setup SHORT
-PASO 6: ¿Action rompió anchor lines? SÍ → UTS=UTAB, DTS=DTAB, SBU=SBUC, SBD=SBDC
+PASO 2: ID ANCHOR (2do color) — grupo de velas del mismo color a la izquierda → marcar HIGH y LOW con bodies
+PASO 3: SIDEWAYS? — ¿previous move (3er color) engulfa el anchor completamente? Si SÍ = SIDEWAYS → SKIP
+PASO 4: CLOSEST OPEN — vela con OPEN más cercano FUERA de anchor lines:
+  - ROJO (c < o) → DOWNTREND | AZUL (c > o) → UPTREND
+PASO 5: SETUP — UT + action ROJA = setup LONG | DT + action AZUL = setup SHORT
+PASO 6: ¿Action rompió anchor lines? SÍ → UTAB/DTAB/SBUC/SBDC
 PASO 7: HTF CONFLUENCE:
-  - UTS Confluence: HTF en UTAB/UT/UTS/SBU/SBUC → HTF going UP → IMPULSE para LONG
-  - DTS Confluence: HTF en DTAB/DT/DTS/SBD/SBDC → HTF going DOWN → IMPULSE para SHORT
-  - Sin confluencia → CORRECTIVE → 1:1 máximo o SKIP
+  - UTS Confluence: HTF en UTAB/UT/UTS/SBU/SBUC → IMPULSE LONG
+  - DTS Confluence: HTF en DTAB/DT/DTS/SBD/SBDC → IMPULSE SHORT
 
-SETUP Y ESTADOS DEL MERCADO:
-- SBD/SBU → demasiado temprano, no hay trade
-- SBDC/SBUC → getting closer, 1 vela más
-- DTS/UTS → ESTADO ÓPTIMO → bajar a H4 y buscar zona dentro del anchor
-- DTAB/UTAB → precio acelerando, buscar pullback entry
-- SBD/SBDC al ver DTS = missed trade → buscar pullback
+ESTADOS ÓPTIMOS: DTS (SHORT) | UTS (LONG)
+Progresión: SBD/SBU → SBDC/SBUC → DTS/UTS → DTAB/UTAB (missed)
 
 ════════════════════════════════
 SEGUNDA PARTE — ENCONTRAR EL NIVEL (en H4)
 ════════════════════════════════
-Buscar zona de entry dentro del anchor Daily. Checklist de odds enhancers (LOOK LEFT):
-
-1. BIG MOVE IN/OUT:
-   - ¿Hay vela grande ENTRANDO a la zona? ¿Vela grande SALIENDO? (más importante)
-   - Ambas confirman validez de la zona
-
-2. 50% BASING CANDLE — DEFINICIÓN EXACTA:
-   - Medir el tamaño TOTAL de la vela basing (body + wicks de extremo a extremo)
-   - El BODY de esa vela debe ser 50% o MENOS del tamaño total
-   - Ejemplo: vela de 20 pips total → body debe ser ≤ 10 pips
-   - Si body > 50% del total → zona débil → reducir confidence o SKIP
-   - Ideal: body muy pequeño vs wicks largos = zona fuerte
-
-3. FRESHNESS (70%+):
-   - Zona fresca = precio no ha regresado a esta área después de formarse
-   - Sin price action a la derecha (excepción: precio actual)
-   - RBR/DBD siempre más fresco que DBR/RBD
-
-4. AUTHENTICITY:
-   - RBR o DBD → SIEMPRE auténtico
-   - DBR o RBD → buscar wall a la izquierda → si hay wall = auténtico | si reacciona de zona previa = NO auténtico
-
-5. WHITESPACE / UFOs (Unfilled Orders):
-   - Contar wicks contra un candle body (wall) a la izquierda
-   - ODD (impar) = establishing = UFOs = órdenes sin llenar → TRADE
-   - EVEN (par) = clearing = órdenes consumidas → SKIP
-   - Zona con 70%+ whitespace = mejor calidad
-
-6. PROFIT POTENTIAL:
-   - ¿Hay espacio suficiente hasta el siguiente barrier?
-   - Nivel opuesto donde el precio podría girar en contra = objetivo realista
-
-ZONA LOCATION: preferir 70% medio del anchor — evitar extremos
+Odds enhancers — verificar cada uno (LOOK LEFT):
+1. BIG MOVE IN/OUT: ¿vela grande entrando/saliendo de la zona? (ya marcado como "BIG MOVE OUT")
+2. 50% BASING CANDLE: body ≤ 50% del tamaño TOTAL de la vela (body+wicks)
+3. FRESHNESS 70%+: zona sin price action a la derecha
+4. AUTHENTICITY: RBR/DBD = siempre auténtico | DBR/RBD = buscar wall
+5. WHITESPACE ODD: contar wicks contra wall → ODD = TRADE | EVEN = SKIP
+6. PROFIT POTENTIAL: espacio hasta siguiente barrier
 
 ════════════════════════════════
-TERCERA PARTE — CÁLCULO DEL 120% ATR BOX Y ENTRY
+TERCERA PARTE — 120% ATR BOX Y ENTRY
 ════════════════════════════════
-Una vez identificada la zona en H4, calcular el box para entry y stop:
-
-CÁLCULO ATR (H4):
-1. Tomar las últimas 14 velas H4
-2. Para cada vela calcular True Range = max(h-l, |h-prev_c|, |l-prev_c|)
-3. ATR = promedio de los 14 True Ranges
-4. ATR_120 = ATR × 1.2
-
-PLACEMENT DEL BOX (LOOK LEFT — cubrir la mayor cantidad de whitespace):
-- Identificar la basing candle dentro de la zona (la de body más pequeño)
-- El box debe cubrir el "move out" — la vela grande que salió de la zona
-- Box height = ATR_120
-- Idealmente 100% whitespace — mínimo 50% whitespace dentro del box
-
-ENTRY Y STOP:
+El ATR y box ya están calculados en el chart context.
 
 Para LONG (Demand Zone):
-- Entry = TOP del box (precio donde el precio entra a la zona de demanda)
-- Stop = BOTTOM del box (precio más bajo del box)
-- Ejemplo: si zona en H4 está entre 1.0820-1.0870 y ATR_120=50pips → box top=1.0870, box bottom=1.0820
-- entry: box_top | stop_loss: box_bottom
+- Entry = TOP del box | Stop = BOTTOM del box
 
 Para SHORT (Supply Zone):
-- Entry = BOTTOM del box (precio donde el precio entra a la zona de oferta)
-- Stop = TOP del box (precio más alto del box)
-- entry: box_bottom | stop_loss: box_top
+- Entry = BOTTOM del box | Stop = TOP del box
 
-CONFIRMACIÓN DE ENTRY — 3 opciones (en H1/M5):
-a) S.E.T. (Set Entry Target): precio hits/crosses la entry line → market order
-b) Market order: precio entra al box → entrar directamente
-c) Confirmation entry (más conservador, mayor probabilidad):
-   - Para LONG: esperar BRB (Blue-Red-Blue) en H1 — price entra al box, baja (red), sube (blue) confirmando
-   - Para SHORT: esperar RBR (Red-Blue-Red) en H1 — price entra al box, sube (blue), baja (red) confirmando
-   - i) CC inside the box → más agresivo, mayor riesgo
-   - ii) CC breaks out of the box → medio
-   - iii) CC confirms outside the box → más conservador, MAYOR PROBABILIDAD ← PREFERIDO
+CONFIRMATION ENTRY H1:
+- LONG: BRB (Blue-Red-Blue) dentro/fuera del box
+- SHORT: RBR (Red-Blue-Red) dentro/fuera del box
+- CC outside box = mayor probabilidad ← PREFERIDO
 
-ONCE GREEN NEVER RED:
-- Una vez que el trade está verde (en profit), no permitir que regrese a rojo
-- Mover stop progresivamente para proteger profit
-
-════════════════════════════════
-ADD-ONS (solo en Race Track)
-════════════════════════════════
-Solo agregar posición adicional cuando:
-1. Precio está en Race Track confirmado
-2. Color change cerró después de 1 ATR del STF (H4/M5)
-3. Exit all add-ons cuando 2 add-ons han ido a rojo — proteger posición original
+ONCE GREEN NEVER RED
 
 ════════════════════════════════
 6 PASOS OVERNIGHT
 ════════════════════════════════
-PASO 1: Check Weekly curve y HTF. ¿Race Track o HTF S/D que interfiera? → SKIP o reduce confidence
-PASO 2: Check noticias. Interest rate news → SKIP. Otras → continuar
-PASO 3: Trend y setup en Daily (7 pasos arriba). Sideways → SKIP. Identificar estado del mercado
-PASO 4: ¿Precio en Weekly curve? ¿HTF S/D podría detener el precio antes del target?
-PASO 5: Encontrar nivel en H4. Aplicar 6 odds enhancers. Calcular ATR_120 y construir box
-PASO 6: Calcular entry (top/bottom del box), stop (bottom/top del box), TP (siguiente barrier en Daily/Weekly)
+PASO 1: Check Weekly trend state y curve. ¿Race Track o HTF S/D? → SKIP o reduce confidence
+PASO 2: Check noticias. Interest rate news → SKIP
+PASO 3: Validar trend state Daily y setup (ya pre-calculado)
+PASO 4: ¿Precio en Weekly curve? ¿HTF S/D podría detener antes del target?
+PASO 5: Validar zona H4 con 6 odds enhancers. Confirmar box top/bottom del pre-procesador
+PASO 6: Reportar entry, stop, TP con los valores del box calculado
 
-SKIP SI: sideways sin bias, action candle rompió anchor, sin setup, interest rate news, HTF S/D en contra, wicks EVEN, sin whitespace, nivel fuera del anchor, basing candle body >50% del total, precio 2+ ATR lejos del entry
+SKIP SI: sideways, action candle rompió anchor, sin setup, interest rate news,
+HTF S/D en contra, wicks EVEN, sin whitespace, basing candle body >50%, precio 2+ ATR lejos
 
 PIPS: XXX/USD = 0.0001 | XXX/JPY = 0.01
 
@@ -511,30 +791,16 @@ export async function runForexAgent({
 }) {
   const systemPrompt = isOvernightWindow ? OVERNIGHT_TRADE_PROMPT : ANCHOR_BREAK_PROMPT
 
-  const candleSection = isOvernightWindow ? `
-=== VELAS W (Weekly — Curve/HTF S/D) ===
-${JSON.stringify(candles.W?.slice(-24) || [], null, 1)}
-
-=== VELAS D (Daily — Trend + Setup) ===
-${JSON.stringify(candles.D?.slice(-30) || [], null, 1)}
-
-=== VELAS H4 (Entry — nivel, stop, target) ===
-${JSON.stringify(candles.H4?.slice(-48) || [], null, 1)}` : `
-=== VELAS H3/H4 (HTF — trend + S/D) ===
-${JSON.stringify(candles.H3?.slice(-48) || [], null, 1)}
-
-=== VELAS M30 (ITF — Anchor Break) ===
-${JSON.stringify(candles.M30?.slice(-60) || [], null, 1)}
-
-=== VELAS M5 (LTF — entry + stop) ===
-${JSON.stringify(candles.M5?.slice(-24) || [], null, 1)}`
+  // ✅ Usar buildChartContext en lugar de JSON crudo
+  const candleSection = buildChartContext(candles, isOvernightWindow, pair)
 
   const strategyInstruction = isOvernightWindow
-    ? 'Aplica el sistema Overnight Trade. Sigue los 6 pasos en orden. Es después de 7PM EST — busca setups para sesión asiática/europea.'
-    : 'Aplica el sistema Anchor Break. Sigue los 6 pasos en orden. Recuerda: velas consecutivas del mismo color sin interrupción = una sola vela de ruptura. Verifica Race Track en paso 6. CRÍTICO: si entry_type="pullback", entry debe ser INFERIOR al precio actual para BUY, SUPERIOR para SELL.'
+    ? 'Aplica el sistema Overnight Trade. Valida el trend state y zona H4 ya pre-calculados. Confirma con odds enhancers y reporta entry/stop del box.'
+    : 'Aplica el sistema Anchor Break. Verifica el label AB CONFIRMED y FRESHNESS en M30. Usa los niveles de entry y stop del M5 pre-calculados. Confirma con los 7 pasos de Jody.'
 
   const userMessage = `
 ANÁLISIS PARA: ${pair.replace('_', '/')}
+
 ${candleSection}
 
 === POSICIONES ABIERTAS ===
@@ -644,7 +910,6 @@ export async function fetchCandles(
 
 export async function fetchNews(currency: string): Promise<string> {
   try {
-    // ✅ Fetch ForexFactory calendar JSON — sin web_search, sin costo extra
     const res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
       headers: { 'User-Agent': 'ForexAI/1.0' }
     })
@@ -654,7 +919,6 @@ export async function fetchNews(currency: string): Promise<string> {
     const today = new Date().toISOString().split('T')[0]
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
-    // Filtrar eventos de hoy y mañana para esta moneda, impacto medio-alto
     const relevant = events.filter((e: any) => {
       const eventDate = e.date?.split('T')[0]
       const isCurrency = e.currency === currency
