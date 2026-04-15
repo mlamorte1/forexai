@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { runForexAgent, matchTactics, fetchCandles, fetchNews } from '@/lib/agent'
-import { sendAlertEmail } from '@/lib/resend'
 import { runForexAgent, matchTactics, fetchCandles, fetchNews, buildChartContext } from '@/lib/agent'
+import { sendAlertEmail } from '@/lib/resend'
 
 export const maxDuration = 300
 
