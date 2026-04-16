@@ -187,7 +187,7 @@ export async function GET(req: Request) {
               console.log('[AB CANDLES OK]', pair, 'H3=' + H3.length, 'M30=' + M30.length, 'M5=' + M5.length)
               if (pair === 'AUD_USD') {
   const { buildChartContextAB } = await import('@/lib/agent-ab')
-  console.log('[AUD_USD CONTEXT]', buildChartContextAB({ H3, M30, M5 }, pair).substring(0, 3000))
+  console.log('[AUD_USD CONTEXT]', buildChartContextAB({ H3, M30, M5 }, pair).substring(0, 6000))
 }
 
               // Freshness check M5 — datos no más de 15 min de antiguedad
