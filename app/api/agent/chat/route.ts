@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { runForexAgent, matchTactics, fetchCandles, fetchNews } from '@/lib/agent'
+import { runAnchorBreakAgent, matchTactics, fetchCandles, fetchNews } from '@/lib/agent-ab'
+import { runOvernightTradeAgent } from '@/lib/agent-ot'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -29,69 +30,47 @@ PASO 7: HTF Confluence:
 Estados válidos: UTS/UTAB/SBUC → LONG | DTS/DTAB/SBDC → SHORT | UTNS/DTNS → SKIP
 
 ════════════════════════════════
-ESTRATEGIA 1: ANCHOR BREAK (H3/H4 → M30 → M5)
+ESTRATEGIA 1: ANCHOR BREAK (H3 → M30 → M5)
 ════════════════════════════════
-LONG: HTF uptrend → M30 corrective move bajista → Pivot Low → AB arriba
-SHORT: HTF downtrend → M30 corrective move alcista → Pivot High → AB abajo
+CORRECTIVE MOVE:
+- Movimiento en M30 que va CONTRA el trend del H3
+- Puede tener interrupciones pequeñas del color opuesto — busca la dirección PREDOMINANTE
+- No es solo velas consecutivas del mismo color
 
-VELAS COMBINADAS — REGLA CRÍTICA:
-- Solo velas consecutivas del MISMO COLOR sin interrupción se combinan
-- ⚠️ UNA sola vela del color opuesto entre medias = combinación ROTA = NO es AB = WAIT
-- El tamaño de la vela de interrupción NO importa
+ANCHOR:
+- Grupo de velas al FINAL del corrective move, justo antes de la vela de ruptura
+- Puede ser 1 sola vela o varias
+- PIVOT = wick más extremo del anchor (NO del corrective move completo)
 
-PIVOT — DEFINICIÓN EXACTA:
-- ⚠️ El pivot NO es el low/high del corrective move completo
-- El pivot es el wick más extremo de las velas del ANCHOR específicamente
-- Las velas del anchor = las últimas 2-3 velas del corrective move justo antes de la vela de ruptura
-- Stop beyond el pivot del ANCHOR — no del corrective move completo
+VELAS DE RUPTURA:
+- Consecutivas del MISMO COLOR sin interrupción
+- ⚠️ UNA sola vela del color opuesto = combinación ROTA = NO es AB
+- El CLOSE debe cerrar fuera del body del anchor (solo close cuenta, NO wicks)
+- Mínimo 2 level breaks
+
+FRESHNESS: contar velas M30 desde el AB hasta la última — si más de 3 → WAIT
 
 FLUJO:
-1. AB en M30 (velas combinadas sin interrupción, 2+ level breaks)
+1. AB en M30 (corrective move + anchor + break con 2+ level breaks)
 2. Sale de HTF S/D — si no → fake out → SKIP
-3. BAJAR A M5 OBLIGATORIO: anchor exacto, entry en break line, stop beyond pivot del ANCHOR en M5
-4. 2+ breaks en M5
-5. HTF confluence → IMPULSE=2:1 | CORRECTIVE=1:1 o SKIP
-6. Whitespace hasta barrier, sin Race Track
+3. BAJAR A M5: anchor exacto, entry en break line, stop beyond pivot del ANCHOR en M5
+4. HTF confluence → IMPULSE=2:1 | CORRECTIVE=1:1 o SKIP
+5. Whitespace hasta barrier, sin Race Track
 
-ENTRY (M5): breakout | pullback al nivel roto | CC en M1 (BRB long, RBR short)
+ENTRY (M5): breakout | pullback | CC en M1 (BRB long, RBR short)
 STOP: beyond pivot del ANCHOR en M5 + buffer (USD: 0.0003-0.0005 | JPY: 0.03-0.05)
 TP: high/low más cercano ANTES del corrective move
-FRESHNESS: contar velas M30 desde el AB hasta la última vela disponible — si más de 3 → WAIT
 
 ════════════════════════════════
-ESTRATEGIA 2: OVERNIGHT TRADE (análisis 7PM-8PM EST — W → D → H4 → H1)
+ESTRATEGIA 2: OVERNIGHT TRADE (análisis 7PM-8PM EST — W → D → H4)
 ════════════════════════════════
 Estado óptimo: DTS (SHORT) | UTS (LONG)
-Progresión: SBD/SBU → SBDC/SBUC → DTS/UTS (ÓPTIMO) → DTAB/UTAB (missed, pullback)
-
-ODDS ENHANCERS H4 (LOOK LEFT):
-1. Big Move In/Out
-2. 50% Basing Candle: body ≤ 50% del tamaño TOTAL de la vela (body+wicks)
-3. Freshness 70%+
-4. Authenticity: RBR/DBD = siempre auténtico | DBR/RBD = buscar wall
-5. Whitespace ODD
-6. Profit Potential
-
-120% ATR BOX:
-- ATR = promedio True Range últimas 14 velas H4
-- ATR_120 = ATR × 1.2
-- LONG (DZ): Entry = TOP del box | Stop = BOTTOM del box
-- SHORT (SZ): Entry = BOTTOM del box | Stop = TOP del box
-
-CONFIRMATION ENTRY H1:
-- LONG: BRB (Blue-Red-Blue) dentro/fuera del box
-- SHORT: RBR (Red-Blue-Red) dentro/fuera del box
-- Confirmación fuera del box = mayor probabilidad
-
-ONCE GREEN NEVER RED — mover stop para proteger profit
+120% ATR BOX: LONG Entry=TOP | SHORT Entry=BOTTOM
+ONCE GREEN NEVER RED
 
 ════════════════════════════════
-3 KEYS (verificar siempre):
-- HEATMAP: noticias de alto impacto → reducir confidence | Interest rate → SKIP
-- DOLLAR: par con USD → verificar si DXY va a favor del trade
-- RACETRACK: NO entrar breaking INTO RT
-
-WICKS: ODD = establishing = TRADE | EVEN = clearing = SKIP
+3 KEYS: HEATMAP | DOLLAR | RACETRACK
+WICKS: ODD = TRADE | EVEN = SKIP
 PIPS: XXX/USD = 0.0001 | XXX/JPY = 0.01
 
 ════════════════════════════════
@@ -99,8 +78,7 @@ CUANDO EL USUARIO PIDE ANÁLISIS DE UN PAR:
 ════════════════════════════════
 - Los resultados del agente vienen en el contexto como "ANÁLISIS DEL AGENTE"
 - Presenta el análisis de forma clara y conversacional
-- Explica el reasoning en términos simples
-- Si hay señal BUY/SELL: muestra entry, stop, TP claramente
+- Si hay señal BUY/SELL: muestra entry, stop, TP claramente con los números de vela citados
 - Si es WAIT: explica exactamente qué falta para que el trade sea válido
 
 CONCLUSIÓN OBLIGATORIA:
@@ -110,7 +88,6 @@ Si WAIT/SKIP: razón + qué activaría el trade
 
 Disclaimer: No es asesoría financiera.`
 
-// Detect if message is asking for pair analysis
 function extractPairFromMessage(message: string, watchedPairs: string[]): string | null {
   const msg = message.toUpperCase()
   for (const pair of watchedPairs) {
@@ -144,7 +121,7 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { messages, pair: selectedPair } = await req.json()
+    const { messages } = await req.json()
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
@@ -180,7 +157,12 @@ export async function POST(req: Request) {
 
       await Promise.all(pairsToAnalyze.map(async (pair: string) => {
         try {
-          let candles: Record<string, any[]>
+          const [base, quote] = pair.split('_')
+          const newsBase = await fetchNews(base)
+          const newsQuote = await fetchNews(quote)
+          const news = [newsBase, newsQuote].filter(Boolean).join('\n')
+
+          let analysis: any
 
           if (isOvernightWindow) {
             const [W, D, H4] = await Promise.all([
@@ -188,26 +170,19 @@ export async function POST(req: Request) {
               fetchCandles(cfg.api_key, cfg.environment, pair, 'D', 30),
               fetchCandles(cfg.api_key, cfg.environment, pair, 'H4', 48),
             ])
-            candles = { W, D, H4 }
+            analysis = await runOvernightTradeAgent({
+              pair, candles: { W, D, H4 }, positions: [], news, tactics, minConfidence: 65
+            })
           } else {
             const [H3, M30, M5] = await Promise.all([
               fetchCandles(cfg.api_key, cfg.environment, pair, 'H3', 48),
               fetchCandles(cfg.api_key, cfg.environment, pair, 'M30', 60),
               fetchCandles(cfg.api_key, cfg.environment, pair, 'M5', 24),
             ])
-            candles = { H3, M30, M5 }
+            analysis = await runAnchorBreakAgent({
+              pair, candles: { H3, M30, M5 }, positions: [], news, tactics, minConfidence: 65
+            })
           }
-
-          const [base, quote] = pair.split('_')
-          const newsBase = await fetchNews(base)
-          const newsQuote = await fetchNews(quote)
-          const news = [newsBase, newsQuote].filter(Boolean).join('\n')
-
-          const analysis = await runForexAgent({
-            pair, candles, positions: [], news, tactics,
-            minConfidence: 65,
-            isOvernightWindow,
-          })
 
           const strategyLabel = isOvernightWindow ? 'Overnight Trade' : 'Anchor Break'
 
@@ -220,8 +195,8 @@ ${analysis.entry ? `Entry: ${analysis.entry}` : ''}
 ${analysis.stop_loss ? `Stop: ${analysis.stop_loss}` : ''}
 ${analysis.take_profit ? `TP: ${analysis.take_profit}` : ''}
 HTF State: ${analysis.htf_state || analysis.market_state || 'N/A'}
-${analysis.box_top ? `Box Top: ${analysis.box_top} | Box Bottom: ${analysis.box_bottom}` : ''}
-${analysis.atr_h4 ? `ATR H4: ${analysis.atr_h4}` : ''}
+AB vela M30: ${analysis.ab_candle_m30 || 'N/A'}
+Freshness velas: ${analysis.freshness_candles || 'N/A'}
 Skip reason: ${analysis.skip_reason || 'ninguna'}
 Reasoning: ${analysis.reasoning}`)
         } catch (e: any) {
