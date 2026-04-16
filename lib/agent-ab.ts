@@ -179,18 +179,24 @@ ANCHOR:
   * Para AB SELL: el wick "h" (high) más alto del anchor
 ⚠️ El pivot es del ANCHOR específicamente — NO del corrective move completo
 
-VELAS DE RUPTURA (BREAK):
-- Velas consecutivas del MISMO COLOR sin interrupción que rompen el anchor
+VELAS DE RUPTURA (BREAK) — REGLA DE COMBINACIÓN:
+- Las velas consecutivas del MISMO COLOR sin interrupción SE COMBINAN como una sola vela de ruptura
+- Ejemplo: vela verde #1 + vela verde #2 consecutivas = UNA sola acción de ruptura combinada
+- Lo que importa es el CLOSE de la ÚLTIMA vela de la combinación
 - ⚠️ UNA SOLA vela del color opuesto entre las break candles = combinación ROTA = NO es AB
-- La última vela del break DEBE cerrar (close) POR FUERA del body del anchor:
-  * AB BUY: close > body_high más alto del anchor
-  * AB SELL: close < body_low más bajo del anchor
+- El tamaño de la interrupción NO importa — cualquier vela del color opuesto invalida la combinación
+- La última vela de la combinación DEBE cerrar (close) POR FUERA del body del anchor:
+  * AB BUY: close de la última vela verde > body_high más alto del anchor
+  * AB SELL: close de la última vela roja < body_low más bajo del anchor
 - ⚠️ El wick NO cuenta para confirmar ruptura — solo el CLOSE
 
 LEVEL BREAKS:
-- Cuenta cuántos body_highs del anchor superó el close final (para BUY)
-- Cuenta cuántos body_lows del anchor rompió el close final (para SELL)
+- Usando el close de la última vela de la combinación:
+  * BUY: cuenta cuántos body_highs del anchor superó ese close
+  * SELL: cuenta cuántos body_lows del anchor rompió ese close
 - Mínimo 2 level breaks para AB válido
+- Ejemplo: anchor tiene 2 velas rojas con body_highs 1.1780 y 1.1790
+  → 2 velas verdes combinadas con close final 1.1795 → superó ambos highs → 2 level breaks ✅
 
 FRESCURA (FRESHNESS):
 - Cuenta las velas M30 desde la vela de ruptura hasta la última vela disponible
