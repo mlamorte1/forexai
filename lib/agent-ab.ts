@@ -190,13 +190,12 @@ VELAS DE RUPTURA (BREAK) — REGLA DE COMBINACIÓN:
   * AB SELL: close de la última vela roja < body_low más bajo del anchor
 - ⚠️ El wick NO cuenta para confirmar ruptura — solo el CLOSE
 
-LEVEL BREAKS:
-- Usando el close de la última vela de la combinación:
-  * BUY: cuenta cuántos body_highs del anchor superó ese close
-  * SELL: cuenta cuántos body_lows del anchor rompió ese close
-- Mínimo 2 level breaks para AB válido
-- Ejemplo: anchor tiene 2 velas rojas con body_highs 1.1780 y 1.1790
-  → 2 velas verdes combinadas con close final 1.1795 → superó ambos highs → 2 level breaks ✅
+CONFIRMACIÓN AB EN M30:
+- El close de la última vela del break debe cerrar FUERA del body del anchor
+  * BUY: close > body_high del anchor → AB CONFIRMADO en M30
+  * SELL: close < body_low del anchor → AB CONFIRMADO en M30
+- El anchor puede ser 1 sola vela o varias — no importa el número
+- ⚠️ Los 2+ level breaks se verifican en M5, NO en M30
 
 FRESCURA (FRESHNESS):
 - Cuenta las velas M30 desde la vela de ruptura hasta la última vela disponible
@@ -215,6 +214,10 @@ Una vez identificado el AB en M30, OBLIGATORIO bajar a M5:
 - Stop = beyond el pivot del anchor en M5 + buffer:
   * XXX/USD: buffer = 0.0003-0.0005
   * XXX/JPY: buffer = 0.03-0.05
+- ⚠️ AQUÍ SE CUENTAN LOS 2+ LEVEL BREAKS OBLIGATORIOS:
+  * Identifica el anchor en M5 (grupo de velas del color opuesto al break)
+  * Las velas de ruptura en M5 deben romper 2+ body levels del anchor M5
+  * Más level breaks = mayor confidence
 - Verifica wicks del anchor M5: ODD = trade | EVEN = skip
 
 3 TIPOS DE ENTRY (en M5 o M1):
@@ -231,10 +234,10 @@ TAKE PROFIT:
 ════════════════════════════════════════════════════════
 6 PASOS DE JODY RESUMIDOS
 ════════════════════════════════════════════════════════
-1. ¿Hay AB válido en M30? (corrective move + anchor + break con 2+ level breaks, close fuera del anchor, sin interrupción en break candles) → Si NO = WAIT
+1. ¿Hay AB válido en M30? (corrective move + anchor + break candles consecutivas sin interrupción, close fuera del body del anchor) → Si NO = WAIT
 2. ¿Saliendo de HTF S/D (H3)? Si NO → probable fake out → WAIT
 3. Baja a M5: anchor exacto, entry en break line, stop beyond pivot, wicks ODD
-4. ¿Level breaks en M5 ≥ 2? Más breaks = mayor confidence
+4. ¿Level breaks en M5 ≥ 2? (contar cuántos body levels del anchor M5 rompieron las break candles) Más breaks = mayor confidence
 5. ¿Dirección AB = trend H3? SÍ = Impulse → 2:1 | NO = Corrective → 1:1 o SKIP
 6. ¿Whitespace hasta barrier? ¿Race Track? RT → reducir TP | Sin whitespace → WAIT
 
